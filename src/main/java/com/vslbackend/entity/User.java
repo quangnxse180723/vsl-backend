@@ -4,7 +4,6 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
-
 import java.time.LocalDateTime;
 
 @Entity
@@ -20,13 +19,13 @@ public class User {
     @Column(name = "user_id")
     private Long userId;
 
-    @Column(columnDefinition = "nvarchar(255)")
+    @Column(nullable = false, unique = true, length = 50)
     private String username;
 
-    @Column(length = 255)
+    @Column(nullable = false, unique = true, length = 255)
     private String email;
 
-    @Column(name = "full_name", columnDefinition = "nvarchar(255)")
+    @Column(name = "full_name", length = 255)
     private String fullName;
 
     @Column(name = "password_hash", length = 255)

@@ -1,0 +1,17 @@
+# Khong dua nhung thu nay vao build context Docker
+target/
+.git/
+.gitignore
+.idea/
+*.iml
+.vscode/
+.mvn/wrapper/maven-wrapper.jar
+
+# KHONG copy secrets vao image - bien moi truong duoc inject luc runtime
+.env
+.env.example
+
+# Tai lieu / file tam
+HELP.md
+*.md
+*.log

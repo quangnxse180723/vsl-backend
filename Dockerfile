@@ -1,0 +1,30 @@
+# ============================================================================
+#  Stage 1: BUILD - bien dich va dong goi jar bang Maven (Java 21)
+# ============================================================================
+FROM maven:3.9-eclipse-temurin-21 AS build
+WORKDIR /app
+
+# Copy truoc pom + lombok.config de tan dung cache layer dependency
+COPY pom.xml lombok.config ./
+RUN mvn -B -q dependency:go-offline
+
+# Copy ma nguon va build (bo qua test trong buoc dong goi image)
+COPY src ./src
+RUN mvn -B -q clean package -DskipTests
+
+# ============================================================================
+#  Stage 2: RUNTIME - chi chua JRE + jar, nhe & bao mat hon
+# ============================================================================
+FROM eclipse-temurin:21-jre-alpine
+WORKDIR /app
+
+# Chay duoi user khong phai root
+RUN addgroup -S spring && adduser -S spring -G spring
+
+COPY --from=build /app/target/*.jar app.jar
+RUN chown spring:spring app.jar
+USER spring
+
+EXPOSE 8080
+
+ENTRYPOINT ["java", "-jar", "app.jar"]
