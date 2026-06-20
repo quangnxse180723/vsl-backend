@@ -44,7 +44,20 @@ public enum ErrorCode {
     REFRESH_TOKEN_EXPIRED("TOKEN_2004", "Refresh token da het han, vui long dang nhap lai", HttpStatus.UNAUTHORIZED),
 
     // ----------------------- USER -----------------------
-    USER_NOT_FOUND("USER_3001", "Khong tim thay nguoi dung", HttpStatus.NOT_FOUND);
+    USER_NOT_FOUND("USER_3001", "Khong tim thay nguoi dung", HttpStatus.NOT_FOUND),
+
+    // ----------------------- AI / VIDEO (AI_4xxx) -----------------------
+    VIDEO_EMPTY("AI_4001", "File video khong duoc de trong", HttpStatus.BAD_REQUEST),
+    VIDEO_INVALID_TYPE("AI_4002", "File tai len phai la video (mp4, webm, mov, ...)", HttpStatus.BAD_REQUEST),
+    VIDEO_CORRUPT("AI_4003", "Video bi hong hoac dinh dang khong duoc ho tro", HttpStatus.UNPROCESSABLE_ENTITY),
+    VIDEO_NO_FRAMES("AI_4004", "Khong the doc frame tu video", HttpStatus.UNPROCESSABLE_ENTITY),
+    AI_MODEL_NOT_LOADED("AI_4005", "Mo hinh AI chua san sang, vui long lien he quan tri vien", HttpStatus.SERVICE_UNAVAILABLE),
+    AI_INFERENCE_ERROR("AI_4006", "Loi trong qua trinh phan tich video", HttpStatus.INTERNAL_SERVER_ERROR),
+
+    // ----------------------- MINIO / STORAGE (STORE_5xxx) -----------------------
+    MINIO_UPLOAD_ERROR("STORE_5001", "Khong the tai video len he thong luu tru", HttpStatus.INTERNAL_SERVER_ERROR),
+    VOCABULARY_NOT_FOUND("STORE_5002", "Khong tim thay tu vung", HttpStatus.NOT_FOUND),
+    CATEGORY_NOT_FOUND("STORE_5003", "Khong tim thay danh muc", HttpStatus.NOT_FOUND);
 
     private final String code;
     private final String message;

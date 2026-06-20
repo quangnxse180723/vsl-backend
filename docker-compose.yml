@@ -3,6 +3,20 @@
 #  Cac bien ${...} duoc Compose tu dong doc tu file .env cung thu muc.
 # ============================================================================
 services:
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: vsl-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
+    ports:
+      - "5555:80"
+    networks:
+      - vsl-net
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   postgres:
     image: postgres:17-alpine
@@ -12,6 +26,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
@@ -25,12 +40,36 @@ services:
     networks:
       - vsl-net
 
+  minio:
+    image: minio/minio:latest
+    container_name: vsl-minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # Web Console
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - vsl-net
+
   app:
     build: .
     container_name: vsl-backend
     restart: unless-stopped
     depends_on:
       postgres:
+        condition: service_healthy
+      minio:
         condition: service_healthy
     environment:
       # Ben trong mang Docker, host cua DB la ten service "postgres"
@@ -41,6 +80,15 @@ services:
       JWT_ACCESS_EXPIRATION: ${JWT_ACCESS_EXPIRATION}
       JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION}
       SERVER_PORT: 8080
+      # MinIO: backend dung internal Docker hostname
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_PUBLIC_ENDPOINT: ${MINIO_PUBLIC_ENDPOINT:-http://localhost:9000}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      # AI Model: mount volume chua file .onnx
+      AI_MODEL_PATH: /app/models/mvitv2_small.onnx
+    volumes:
+      - ./models:/app/models:ro
     ports:
       - "${SERVER_PORT:-8080}:8080"
     healthcheck:
@@ -54,7 +102,10 @@ services:
 
 volumes:
   vsl-pgdata:
+  minio_data:
 
 networks:
   vsl-net:
     driver: bridge
+
+

@@ -14,12 +14,16 @@ RUN mvn -B -q clean package -DskipTests
 
 # ============================================================================
 #  Stage 2: RUNTIME - chi chua JRE + jar, nhe & bao mat hon
+#
+#  Dung eclipse-temurin:21-jre-jammy (Ubuntu 22.04, glibc) thay vi alpine.
+#  Ly do: ONNX Runtime & JavaCV native libs (.so) duoc compile cho glibc.
+#  Alpine dung musl libc nen thieu libstdc++.so.6 → UnsatisfiedLinkError.
 # ============================================================================
-FROM eclipse-temurin:21-jre-alpine
+FROM eclipse-temurin:21-jre-jammy
 WORKDIR /app
 
-# Chay duoi user khong phai root
-RUN addgroup -S spring && adduser -S spring -G spring
+# Chay duoi user khong phai root (dung Debian/Ubuntu syntax)
+RUN groupadd -r spring && useradd -r -g spring spring
 
 COPY --from=build /app/target/*.jar app.jar
 RUN chown spring:spring app.jar

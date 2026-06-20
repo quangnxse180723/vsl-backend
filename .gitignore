@@ -29,9 +29,16 @@ build/
 !**/src/main/**/build/
 !**/src/test/**/build/
 
+
+### AI-model ###
+/models/
 ### VS Code ###
 .vscode/
 
 ### Secrets ###
 .env
 !.env.example
+
+### Local notes / Postman collection (chua thong tin nhay cam, khong push) ###
+PROJECT_NOTES.txt
+VSL_Backend_Postman_Collection.json

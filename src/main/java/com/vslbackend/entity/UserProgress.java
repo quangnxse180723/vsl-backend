@@ -26,7 +26,8 @@ public class UserProgress {
     private Vocabulary vocabulary;
 
     @Enumerated(EnumType.STRING)
-    private Status status;
+    @Column(name = "learning_status")
+    private LearningStatus learningStatus;
 
     @Column(name = "last_attempted_at")
     private LocalDateTime lastAttemptedAt;

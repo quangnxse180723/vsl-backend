@@ -1,0 +1,153 @@
+package com.vslbackend.service;
+
+import com.vslbackend.exception.AppException;
+import com.vslbackend.exception.ErrorCode;
+import io.minio.*;
+import io.minio.http.Method;
+import io.minio.messages.DeleteObject;
+import jakarta.annotation.PostConstruct;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.InputStream;
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class MinioService {
+
+    private final MinioClient minioClient;
+
+    @Value("${minio.bucket.tutorials}")
+    private String tutorialBucket;
+
+    @Value("${minio.public-endpoint}")
+    private String publicEndpoint;
+
+    /**
+     * Tao bucket neu chua ton tai va cau hinh chinh sach doc cong khai.
+     * Loi MinIO khong cat startup cua ung dung - chi log warning.
+     */
+    @PostConstruct
+    public void initBucket() {
+        try {
+            boolean exists = minioClient.bucketExists(
+                    BucketExistsArgs.builder().bucket(tutorialBucket).build());
+
+            if (!exists) {
+                minioClient.makeBucket(MakeBucketArgs.builder().bucket(tutorialBucket).build());
+                setPublicReadPolicy(tutorialBucket);
+                log.info("MinIO: Created bucket '{}' with public-read policy.", tutorialBucket);
+            } else {
+                log.info("MinIO: Bucket '{}' already exists.", tutorialBucket);
+            }
+        } catch (Exception e) {
+            log.warn("MinIO initialization failed ({}). Upload will be unavailable until MinIO is reachable.", e.getMessage());
+        }
+    }
+
+    /**
+     * Upload video bai hoc mau len MinIO.
+     *
+     * @param file       file tu admin
+     * @param objectName ten object trong bucket (vd: "category1/word_hello.mp4")
+     * @return URL cong khai ma frontend dung de stream video
+     */
+    public String uploadTutorialVideo(MultipartFile file, String objectName) {
+        try (InputStream is = file.getInputStream()) {
+            minioClient.putObject(
+                    PutObjectArgs.builder()
+                            .bucket(tutorialBucket)
+                            .object(objectName)
+                            .stream(is, file.getSize(), -1)
+                            .contentType(file.getContentType() != null ? file.getContentType() : "video/mp4")
+                            .build());
+
+            String url = buildPublicUrl(tutorialBucket, objectName);
+            log.info("Uploaded tutorial video: {} -> {}", objectName, url);
+            return url;
+        } catch (Exception e) {
+            log.error("MinIO upload failed for object '{}': {}", objectName, e.getMessage(), e);
+            throw new AppException(ErrorCode.MINIO_UPLOAD_ERROR, "Loi tai len: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Tao ten object duy nhat cho video: {vocabularyId}/{uuid}.mp4
+     */
+    public String generateObjectName(Long vocabularyId, String originalFilename) {
+        String ext = extractExtension(originalFilename);
+        return "vocabulary-" + vocabularyId + "/" + UUID.randomUUID() + ext;
+    }
+
+    /**
+     * Xoa object khoi bucket (dung khi thay the video mau).
+     */
+    public void deleteObject(String objectName) {
+        try {
+            minioClient.removeObject(
+                    RemoveObjectArgs.builder()
+                            .bucket(tutorialBucket)
+                            .object(objectName)
+                            .build());
+            log.info("Deleted MinIO object: {}", objectName);
+        } catch (Exception e) {
+            log.warn("Could not delete MinIO object '{}': {}", objectName, e.getMessage());
+        }
+    }
+
+    /**
+     * Presigned URL co han (7 ngay) cho object trong bucket private.
+     * Hien tai bucket tutorial la public, method nay du phong cho bucket private.
+     */
+    public String getPresignedUrl(String bucketName, String objectName) {
+        try {
+            return minioClient.getPresignedObjectUrl(
+                    GetPresignedObjectUrlArgs.builder()
+                            .method(Method.GET)
+                            .bucket(bucketName)
+                            .object(objectName)
+                            .expiry(7, TimeUnit.DAYS)
+                            .build());
+        } catch (Exception e) {
+            log.error("Could not generate presigned URL for {}/{}: {}", bucketName, objectName, e.getMessage());
+            throw new AppException(ErrorCode.MINIO_UPLOAD_ERROR, "Khong the tao URL: " + e.getMessage());
+        }
+    }
+
+    // ------------------------------------------------------------------
+
+    private String buildPublicUrl(String bucket, String objectName) {
+        return publicEndpoint.replaceAll("/$", "") + "/" + bucket + "/" + objectName;
+    }
+
+    private void setPublicReadPolicy(String bucket) throws Exception {
+        String policy = """
+                {
+                  "Version": "2012-10-17",
+                  "Statement": [
+                    {
+                      "Effect": "Allow",
+                      "Principal": {"AWS": ["*"]},
+                      "Action": ["s3:GetObject"],
+                      "Resource": ["arn:aws:s3:::%s/*"]
+                    }
+                  ]
+                }
+                """.formatted(bucket);
+
+        minioClient.setBucketPolicy(
+                SetBucketPolicyArgs.builder().bucket(bucket).config(policy).build());
+    }
+
+    private String extractExtension(String filename) {
+        if (filename == null || !filename.contains(".")) return ".mp4";
+        return filename.substring(filename.lastIndexOf('.'));
+    }
+}

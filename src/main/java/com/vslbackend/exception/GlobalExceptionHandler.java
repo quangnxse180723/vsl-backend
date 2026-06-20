@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.concurrent.RejectedExecutionException;
 
 /**
  * Diem bat loi tap trung cho toan he thong - moi loi deu tra ve {@link ErrorResponse} chuan JSON.
@@ -66,6 +67,14 @@ public class GlobalExceptionHandler {
                                                                  HttpServletRequest request) {
         ErrorCode ec = ErrorCode.METHOD_NOT_ALLOWED;
         return build(ec.getStatus(), ec.name(), ec.getCode(), ec.getMessage(), request, null);
+    }
+
+    /** AI queue day (aiTaskExecutor queueCapacity vuot nguong). Tra 503. */
+    @ExceptionHandler(RejectedExecutionException.class)
+    public ResponseEntity<ErrorResponse> handleQueueFull(RejectedExecutionException ex,
+                                                         HttpServletRequest request) {
+        return build(HttpStatus.SERVICE_UNAVAILABLE, "QUEUE_FULL", "AI_4007",
+                "He thong dang qua tai, vui long thu lai sau vai giay", request, null);
     }
 
     /** Luoi an toan cuoi cung - khong lo stack trace ra ngoai. */
