@@ -37,6 +37,11 @@ public class User {
     @Enumerated(EnumType.STRING)
     private Role role;
 
+    @Enumerated(EnumType.STRING)
+    @Column(columnDefinition = "varchar(20) default 'ACTIVE'")
+    @Builder.Default
+    private UserStatus status = UserStatus.ACTIVE;
+
     @CreationTimestamp
     @Column(name = "created_at")
     private LocalDateTime createdAt;
