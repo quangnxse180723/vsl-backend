@@ -10,4 +10,9 @@ public interface CategoryService {
 
     CategoryResponse getCategoryById(Long id);
 
+    CategoryResponse createCategory(com.vslbackend.dto.request.admin.AdminCreateCategoryRequest request);
+
+    CategoryResponse updateCategory(Long id, com.vslbackend.dto.request.admin.AdminUpdateCategoryRequest request);
+
+    void deleteCategory(Long id);
 }
