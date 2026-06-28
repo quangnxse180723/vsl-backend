@@ -10,4 +10,6 @@ import java.util.Optional;
 public interface VocabularyRepository extends JpaRepository<Vocabulary, Long> {
 
     Optional<Vocabulary> findByExpectedId(Integer expectedId);
+
+    boolean existsByCategoryId(Long categoryId);
 }
