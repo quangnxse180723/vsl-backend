@@ -42,3 +42,6 @@ build/
 ### Local notes / Postman collection (chua thong tin nhay cam, khong push) ###
 PROJECT_NOTES.txt
 VSL_Backend_Postman_Collection.json
+mvitv2_small.onnx
+vsl_db.dump
+minio_data.tar.gz
