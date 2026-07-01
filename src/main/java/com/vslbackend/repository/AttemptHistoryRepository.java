@@ -13,6 +13,8 @@ import java.util.List;
 @Repository
 public interface AttemptHistoryRepository extends JpaRepository<AttemptHistory, Long> {
 
+    boolean existsByVocabulary_Id(Long vocabularyId);
+
     @Query(
             value = """
                     SELECT h FROM AttemptHistory h

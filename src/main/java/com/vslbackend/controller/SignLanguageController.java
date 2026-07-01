@@ -10,6 +10,7 @@ import com.vslbackend.entity.UserProgress;
 import com.vslbackend.entity.Vocabulary;
 import com.vslbackend.exception.AppException;
 import com.vslbackend.exception.ErrorCode;
+import com.vslbackend.repository.AttemptHistoryRepository;
 import com.vslbackend.repository.CategoryRepository;
 import com.vslbackend.repository.UserProgressRepository;
 import com.vslbackend.repository.VocabularyRepository;
@@ -42,6 +43,7 @@ public class SignLanguageController {
     private final VocabularyRepository vocabularyRepository;
     private final CategoryRepository categoryRepository;
     private final UserProgressRepository userProgressRepository;
+    private final AttemptHistoryRepository attemptHistoryRepository;
 
     // =====================================================================
     //  PRACTICE - bat buoc JWT (anyRequest().authenticated() trong SecurityConfig)
@@ -192,5 +194,32 @@ public class SignLanguageController {
 
         log.info("Admin uploaded tutorial video for vocabularyId={}, url={}", vocabularyId, publicUrl);
         return ResponseEntity.ok(ApiResponse.of("Upload thanh cong", publicUrl));
+    }
+
+    /**
+     * Xoa mot tu vung (va video mau tren MinIO neu co). Chan xoa neu tu vung
+     * da co lich su luyen tap hoac tien trinh hoc gan voi no, tranh mo coi du lieu.
+     *
+     * <pre>
+     * DELETE /api/admin/vocabulary/{id}
+     * Authorization: Bearer {adminToken}
+     * </pre>
+     */
+    @DeleteMapping("/api/admin/vocabulary/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> deleteVocabulary(@PathVariable Long id) {
+        Vocabulary vocabulary = vocabularyRepository.findById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.VOCABULARY_NOT_FOUND));
+
+        if (attemptHistoryRepository.existsByVocabulary_Id(id) || userProgressRepository.existsByVocabulary_Id(id)) {
+            throw new AppException(ErrorCode.INVALID_REQUEST,
+                    "Khong the xoa tu vung vi da co lich su luyen tap hoac tien trinh hoc gan voi tu vung nay");
+        }
+
+        minioService.deleteTutorialVideoByUrl(vocabulary.getVideoTutorialUrl());
+        vocabularyRepository.delete(vocabulary);
+
+        log.info("Admin deleted vocabulary id={}", id);
+        return ResponseEntity.ok(ApiResponse.of("Xoa tu vung thanh cong"));
     }
 }

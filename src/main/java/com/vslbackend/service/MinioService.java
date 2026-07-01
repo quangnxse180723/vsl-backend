@@ -103,6 +103,21 @@ public class MinioService {
     }
 
     /**
+     * Xoa video tutorial dua tren public URL da luu trong Vocabulary.videoTutorialUrl.
+     * Bo qua neu url null/rong hoac khong khop dinh dang public URL cua bucket nay.
+     */
+    public void deleteTutorialVideoByUrl(String url) {
+        if (url == null || url.isBlank()) return;
+
+        String marker = "/" + tutorialBucket + "/";
+        int idx = url.indexOf(marker);
+        if (idx < 0) return;
+
+        String objectName = url.substring(idx + marker.length());
+        deleteObject(objectName);
+    }
+
+    /**
      * Presigned URL co han (7 ngay) cho object trong bucket private.
      * Hien tai bucket tutorial la public, method nay du phong cho bucket private.
      */

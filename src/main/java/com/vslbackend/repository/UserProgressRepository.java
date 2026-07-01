@@ -14,6 +14,8 @@ public interface UserProgressRepository extends JpaRepository<UserProgress, Long
 
     Optional<UserProgress> findByUser_UserIdAndVocabulary_Id(Long userId, Long vocabularyId);
 
+    boolean existsByVocabulary_Id(Long vocabularyId);
+
     @Query("SELECT p FROM UserProgress p " +
            "JOIN FETCH p.vocabulary v " +
            "JOIN FETCH v.category " +
