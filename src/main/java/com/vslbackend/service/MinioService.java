@@ -30,25 +30,33 @@ public class MinioService {
     @Value("${minio.public-endpoint}")
     private String publicEndpoint;
 
+    @Value("${minio.bucket.avatars}")
+    private String avatarBucket;
+
     /**
      * Tao bucket neu chua ton tai va cau hinh chinh sach doc cong khai.
      * Loi MinIO khong cat startup cua ung dung - chi log warning.
      */
     @PostConstruct
-    public void initBucket() {
+    private void initBucket(String bucket) {
         try {
             boolean exists = minioClient.bucketExists(
-                    BucketExistsArgs.builder().bucket(tutorialBucket).build());
+                    BucketExistsArgs.builder()
+                            .bucket(bucket)
+                            .build());
 
             if (!exists) {
-                minioClient.makeBucket(MakeBucketArgs.builder().bucket(tutorialBucket).build());
-                setPublicReadPolicy(tutorialBucket);
-                log.info("MinIO: Created bucket '{}' with public-read policy.", tutorialBucket);
-            } else {
-                log.info("MinIO: Bucket '{}' already exists.", tutorialBucket);
+                minioClient.makeBucket(
+                        MakeBucketArgs.builder()
+                                .bucket(bucket)
+                                .build());
+
+                setPublicReadPolicy(bucket);
+
+                log.info("Created bucket {}", bucket);
             }
         } catch (Exception e) {
-            log.warn("MinIO initialization failed ({}). Upload will be unavailable until MinIO is reachable.", e.getMessage());
+            log.warn("Init bucket {} failed: {}", bucket, e.getMessage());
         }
     }
 
@@ -133,6 +141,33 @@ public class MinioService {
         } catch (Exception e) {
             log.error("Could not generate presigned URL for {}/{}: {}", bucketName, objectName, e.getMessage());
             throw new AppException(ErrorCode.MINIO_UPLOAD_ERROR, "Khong the tao URL: " + e.getMessage());
+        }
+    }
+
+    public String uploadAvatar(MultipartFile file) {
+
+        try (InputStream is = file.getInputStream()) {
+
+            String objectName =
+                    UUID.randomUUID()
+                            + "-"
+                            + file.getOriginalFilename();
+
+            minioClient.putObject(
+                    PutObjectArgs.builder()
+                            .bucket(avatarBucket)
+                            .object(objectName)
+                            .stream(is, file.getSize(), -1)
+                            .contentType(file.getContentType())
+                            .build()
+            );
+
+            return buildPublicUrl(avatarBucket, objectName);
+
+        } catch (Exception e) {
+            throw new AppException(
+                    ErrorCode.MINIO_UPLOAD_ERROR,
+                    "Upload avatar failed");
         }
     }
 
