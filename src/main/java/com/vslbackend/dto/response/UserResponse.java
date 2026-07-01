@@ -16,5 +16,6 @@ public class UserResponse {
     private final String fullName;
     private final String avatarUrl;
     private final Role role;
+    private final com.vslbackend.entity.UserStatus status;
     private final LocalDateTime createdAt;
 }
