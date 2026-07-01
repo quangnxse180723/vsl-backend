@@ -38,7 +38,6 @@ public class User {
     private Role role;
 
     @Enumerated(EnumType.STRING)
-    @Column(columnDefinition = "varchar(20) default 'ACTIVE'")
     @Builder.Default
     private UserStatus status = UserStatus.ACTIVE;
 

@@ -38,6 +38,11 @@ public class MinioService {
      * Loi MinIO khong cat startup cua ung dung - chi log warning.
      */
     @PostConstruct
+    public void initBuckets() {
+        initBucket(tutorialBucket);
+        initBucket(avatarBucket);
+    }
+
     private void initBucket(String bucket) {
         try {
             boolean exists = minioClient.bucketExists(
