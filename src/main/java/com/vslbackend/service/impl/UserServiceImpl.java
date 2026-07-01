@@ -33,9 +33,6 @@ public class UserServiceImpl implements UserService {
     private final PasswordEncoder passwordEncoder;
     private final MinioService minioService;
 
-    @Value("${minio.bucket-name}")
-    private String bucketName;
-
     @Override
     public UserResponse getCurrentUser() {
         User user = getCurrentUserEntity();
