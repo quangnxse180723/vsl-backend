@@ -33,4 +33,8 @@ public interface AttemptHistoryRepository extends JpaRepository<AttemptHistory, 
             ORDER BY h.attemptedAt DESC, h.id DESC
             """)
     List<AttemptHistory> findRecentByUserId(@Param("userId") Long userId, Pageable pageable);
+
+    long countByUser_UserId(Long userId);
+
+    long countByUser_UserIdAndIsCorrect(Long userId, boolean isCorrect);
 }

@@ -88,6 +88,7 @@ public class SignLanguageInferenceService implements SignLanguageEvaluationServi
     private final AttemptHistoryRepository attemptHistoryRepository;
     private final UserRepository           userRepository;
     private final UserProgressRepository   userProgressRepository;
+    private final com.vslbackend.service.inter.AchievementService achievementService;
 
     @Value("${ai.model.path:./models/mvitv2_small.onnx}")
     private String modelPath;
@@ -203,7 +204,7 @@ public class SignLanguageInferenceService implements SignLanguageEvaluationServi
             EvaluationResponse response = buildResponse(probabilities, expectedId);
 
             // 6. Ghi lich su (non-critical - loi khong anh huong response)
-            persistAttempt(userId, expectedId, response.getPredictedId(), response.getStatus());
+            persistAttempt(userId, expectedId, response.getPredictedId(), response.getStatus(), response.getConfidence());
 
             log.info("Evaluation done: expectedId={}, status={}, confidence={}%, rank={}",
                     expectedId, response.getStatus(), response.getConfidence(), response.getRank());
@@ -489,7 +490,7 @@ public class SignLanguageInferenceService implements SignLanguageEvaluationServi
      * Ghi lich su thu thuc hanh vao DB.
      * Loi o day KHONG anh huong den response tra ve cho client.
      */
-    private void persistAttempt(Long userId, int expectedId, int predictedId, String status) {
+    private void persistAttempt(Long userId, int expectedId, int predictedId, String status, double confidence) {
         try {
             User user = userRepository.findById(userId).orElse(null);
             Vocabulary vocab = vocabularyRepository.findByExpectedId(expectedId).orElse(null);
@@ -500,10 +501,17 @@ public class SignLanguageInferenceService implements SignLanguageEvaluationServi
                     .vocabulary(vocab)
                     .isCorrect(passed)
                     .aiPredictedCode((long) predictedId)
+                    .confidence(confidence)
                     .attemptedAt(LocalDateTime.now())
                     .build();
 
             attemptHistoryRepository.save(history);
+
+            // Unlock achievements sau mỗi lần thực hành
+            if (user != null) {
+                try { achievementService.checkAndUnlock(userId); }
+                catch (Exception e) { log.warn("Achievement check failed for userId={}: {}", userId, e.getMessage()); }
+            }
 
             if (user != null && vocab != null) {
                 updateUserProgress(user, vocab, passed);

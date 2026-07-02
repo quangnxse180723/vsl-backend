@@ -20,4 +20,6 @@ public interface UserProgressRepository extends JpaRepository<UserProgress, Long
            "WHERE p.user.userId = :userId " +
            "ORDER BY p.lastAttemptedAt DESC")
     List<UserProgress> findAllWithVocabularyByUserId(@Param("userId") Long userId);
+
+    long countByUser_UserIdAndLearningStatus(Long userId, com.vslbackend.entity.LearningStatus status);
 }
