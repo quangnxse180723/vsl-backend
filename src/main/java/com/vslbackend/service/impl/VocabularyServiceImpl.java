@@ -54,6 +54,7 @@ public class VocabularyServiceImpl implements VocabularyService {
                 .word(v.getWord())
                 .description(v.getDescription())
                 .videoTutorialUrl(v.getVideoTutorialUrl())
+                .imageUrl(v.getImageUrl())
                 .expectedId(v.getExpectedId())
                 .build();
     }

@@ -12,5 +12,6 @@ public class VocabularyResponse {
     private final String word;
     private final String description;
     private final String videoTutorialUrl;
+    private final String imageUrl;
     private final Integer expectedId;
 }

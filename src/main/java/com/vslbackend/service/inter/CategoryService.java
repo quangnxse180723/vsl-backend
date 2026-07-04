@@ -3,6 +3,7 @@ package com.vslbackend.service.inter;
 import com.vslbackend.dto.response.CategoryResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 @Service
 public interface CategoryService {
@@ -15,4 +16,6 @@ public interface CategoryService {
     CategoryResponse updateCategory(Long id, com.vslbackend.dto.request.admin.AdminUpdateCategoryRequest request);
 
     void deleteCategory(Long id);
+
+    String uploadCategoryImage(Long id, MultipartFile image);
 }

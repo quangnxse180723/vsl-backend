@@ -20,4 +20,7 @@ public class Category {
 
     @Column(length = 255)
     private String description;
+
+    @Column(name = "image_url", length = 500)
+    private String imageUrl;
 }

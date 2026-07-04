@@ -9,11 +9,13 @@ import com.vslbackend.dto.request.admin.AdminCreateCategoryRequest;
 import com.vslbackend.dto.request.admin.AdminUpdateCategoryRequest;
 import com.vslbackend.exception.AppException;
 import com.vslbackend.exception.ErrorCode;
+import com.vslbackend.service.MinioService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -22,6 +24,7 @@ import java.util.List;
 public class CategoryServiceImpl implements CategoryService {
     private final CategoryRepository categoryRepository;
     private final VocabularyRepository vocabularyRepository;
+    private final MinioService minioService;
 
     @Override
     public Page<CategoryResponse> getAllCategories(int page, int size) {
@@ -32,6 +35,7 @@ public class CategoryServiceImpl implements CategoryService {
                         .id(category.getId())
                         .name(category.getName())
                         .description(category.getDescription())
+                        .imageUrl(category.getImageUrl())
                         .build());
     }
 
@@ -45,6 +49,7 @@ public class CategoryServiceImpl implements CategoryService {
                 .id(category.getId())
                 .name(category.getName())
                 .description(category.getDescription())
+                .imageUrl(category.getImageUrl())
                 .build();
     }
 
@@ -64,6 +69,7 @@ public class CategoryServiceImpl implements CategoryService {
                 .id(saved.getId())
                 .name(saved.getName())
                 .description(saved.getDescription())
+                .imageUrl(saved.getImageUrl())
                 .build();
     }
 
@@ -84,6 +90,7 @@ public class CategoryServiceImpl implements CategoryService {
                 .id(saved.getId())
                 .name(saved.getName())
                 .description(saved.getDescription())
+                .imageUrl(saved.getImageUrl())
                 .build();
     }
 
@@ -96,6 +103,24 @@ public class CategoryServiceImpl implements CategoryService {
             throw new AppException(ErrorCode.INVALID_REQUEST, "Khong the xoa danh muc vi van con tu vung nam trong danh muc nay");
         }
 
+        minioService.deleteCategoryImageByUrl(category.getImageUrl());
         categoryRepository.delete(category);
+    }
+
+    @Override
+    public String uploadCategoryImage(Long id, MultipartFile image) {
+        Category category = categoryRepository.findById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.CATEGORY_NOT_FOUND));
+
+        // Replace the previous image (if any) so the bucket doesn't accumulate orphans.
+        minioService.deleteCategoryImageByUrl(category.getImageUrl());
+
+        String objectName = minioService.generateCategoryImageObjectName(id, image.getOriginalFilename());
+        String publicUrl = minioService.uploadCategoryImage(image, objectName);
+
+        category.setImageUrl(publicUrl);
+        categoryRepository.save(category);
+
+        return publicUrl;
     }
 }

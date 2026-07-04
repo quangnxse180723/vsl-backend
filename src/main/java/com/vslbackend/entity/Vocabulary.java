@@ -28,6 +28,9 @@ public class Vocabulary {
     @Column(name = "video_tutorial_url", length = 500)
     private String videoTutorialUrl;
 
+    @Column(name = "image_url", length = 500)
+    private String imageUrl;
+
     @Column(name = "expected_id")
     private Integer expectedId;
 }

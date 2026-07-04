@@ -16,6 +16,7 @@ import com.vslbackend.repository.UserProgressRepository;
 import com.vslbackend.repository.VocabularyRepository;
 import com.vslbackend.security.CustomUserDetails;
 import com.vslbackend.service.MinioService;
+import com.vslbackend.service.VideoTranscodingService;
 import com.vslbackend.service.inter.SignLanguageEvaluationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +29,8 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -40,6 +43,7 @@ public class SignLanguageController {
 
     private final SignLanguageEvaluationService evaluationService;
     private final MinioService minioService;
+    private final VideoTranscodingService videoTranscodingService;
     private final VocabularyRepository vocabularyRepository;
     private final CategoryRepository categoryRepository;
     private final UserProgressRepository userProgressRepository;
@@ -154,6 +158,7 @@ public class SignLanguageController {
                 .word(vocabulary.getWord())
                 .description(vocabulary.getDescription())
                 .videoTutorialUrl(vocabulary.getVideoTutorialUrl())
+                .imageUrl(vocabulary.getImageUrl())
                 .expectedId(vocabulary.getExpectedId())
                 .build();
 
@@ -185,15 +190,68 @@ public class SignLanguageController {
         Vocabulary vocabulary = vocabularyRepository.findById(vocabularyId)
                 .orElseThrow(() -> new AppException(ErrorCode.VOCABULARY_NOT_FOUND));
 
-        String objectName = minioService.generateObjectName(vocabularyId, video.getOriginalFilename());
-        String publicUrl  = minioService.uploadTutorialVideo(video, objectName);
+        File tempInput = null;
+        File tempOutput = null;
+        try {
+            tempInput = File.createTempFile("vsl_video_upload_", ".tmp");
+            video.transferTo(tempInput);
 
-        vocabulary.setVideoTutorialUrl(publicUrl);
-        vocabulary.setExpectedId(expectedId);
+            // Chuan hoa ve H.264/AAC: video nguon co the dung codec (vd mp4v) ma
+            // trinh duyet khong giai ma duoc qua the <video>.
+            tempOutput = videoTranscodingService.transcodeToH264(tempInput);
+
+            String objectName = minioService.generateObjectName(vocabularyId, "video.mp4");
+            String publicUrl  = minioService.uploadTutorialVideo(tempOutput, objectName);
+
+            vocabulary.setVideoTutorialUrl(publicUrl);
+            vocabulary.setExpectedId(expectedId);
+            vocabularyRepository.save(vocabulary);
+
+            log.info("Admin uploaded tutorial video for vocabularyId={}, url={}", vocabularyId, publicUrl);
+            return ResponseEntity.ok(ApiResponse.of("Upload thanh cong", publicUrl));
+        } catch (AppException e) {
+            throw e;
+        } catch (IOException e) {
+            throw new AppException(ErrorCode.MINIO_UPLOAD_ERROR, "Khong the doc file tai len: " + e.getMessage());
+        } finally {
+            if (tempInput != null) tempInput.delete();
+            if (tempOutput != null) tempOutput.delete();
+        }
+    }
+
+    /**
+     * Upload anh minh hoa tu vung len MinIO va luu URL vao Vocabulary.
+     *
+     * <pre>
+     * POST /api/admin/vocabulary/{vocabularyId}/image
+     * Content-Type: multipart/form-data
+     * Authorization: Bearer {adminToken}
+     *
+     * Form fields:
+     *   image (required) - file anh (.jpg / .png / .webp)
+     * </pre>
+     */
+    @PostMapping(value = "/api/admin/vocabulary/{vocabularyId}/image",
+                 consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<String>> uploadVocabularyImage(
+            @PathVariable Long vocabularyId,
+            @RequestPart("image") MultipartFile image) {
+
+        Vocabulary vocabulary = vocabularyRepository.findById(vocabularyId)
+                .orElseThrow(() -> new AppException(ErrorCode.VOCABULARY_NOT_FOUND));
+
+        // Replace the previous image (if any) so the bucket doesn't accumulate orphans.
+        minioService.deleteVocabularyImageByUrl(vocabulary.getImageUrl());
+
+        String objectName = minioService.generateImageObjectName(vocabularyId, image.getOriginalFilename());
+        String publicUrl  = minioService.uploadVocabularyImage(image, objectName);
+
+        vocabulary.setImageUrl(publicUrl);
         vocabularyRepository.save(vocabulary);
 
-        log.info("Admin uploaded tutorial video for vocabularyId={}, url={}", vocabularyId, publicUrl);
-        return ResponseEntity.ok(ApiResponse.of("Upload thanh cong", publicUrl));
+        log.info("Admin uploaded image for vocabularyId={}, url={}", vocabularyId, publicUrl);
+        return ResponseEntity.ok(ApiResponse.of("Upload anh thanh cong", publicUrl));
     }
 
     /**
@@ -217,6 +275,7 @@ public class SignLanguageController {
         }
 
         minioService.deleteTutorialVideoByUrl(vocabulary.getVideoTutorialUrl());
+        minioService.deleteVocabularyImageByUrl(vocabulary.getImageUrl());
         vocabularyRepository.delete(vocabulary);
 
         log.info("Admin deleted vocabulary id={}", id);
