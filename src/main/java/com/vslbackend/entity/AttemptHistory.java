@@ -31,6 +31,9 @@ public class AttemptHistory {
     @Column(name = "ai_predicted_code")
     private Long aiPredictedCode;
 
+    @Column(name = "confidence")
+    private Double confidence;
+
     @Column(name = "attempted_at")
     private LocalDateTime attemptedAt;
 }

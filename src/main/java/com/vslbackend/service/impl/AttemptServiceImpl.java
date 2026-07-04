@@ -59,6 +59,7 @@ public class AttemptServiceImpl implements AttemptService {
                 .expectedId(vocabulary != null ? vocabulary.getExpectedId() : null)
                 .isCorrect(attempt.getIsCorrect())
                 .aiPredictedCode(attempt.getAiPredictedCode())
+                .confidence(attempt.getConfidence())
                 .attemptedAt(attempt.getAttemptedAt())
                 .build();
     }
