@@ -16,5 +16,6 @@ public class AttemptResponse {
     private final Integer expectedId;
     private final Boolean isCorrect;
     private final Long aiPredictedCode;
+    private final Double confidence;
     private final LocalDateTime attemptedAt;
 }

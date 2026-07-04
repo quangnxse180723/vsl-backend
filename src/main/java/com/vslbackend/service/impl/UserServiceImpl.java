@@ -5,6 +5,7 @@ import com.vslbackend.dto.request.user.UpdateUserRequest;
 import com.vslbackend.dto.response.UserResponse;
 import com.vslbackend.entity.User;
 import com.vslbackend.repository.UserRepository;
+import com.vslbackend.service.MinioService;
 import com.vslbackend.service.inter.UserService;
 import io.minio.GetPresignedObjectUrlArgs;
 import io.minio.MinioClient;
@@ -30,10 +31,7 @@ import java.util.UUID;
 public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-    private final MinioClient minioClient;
-
-    @Value("${minio.bucket-name}")
-    private String bucketName;
+    private final MinioService minioService;
 
     @Override
     public UserResponse getCurrentUser() {
@@ -73,35 +71,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public String uploadAvatar(MultipartFile file) {
-        try {
-            String fileName = UUID.randomUUID()
-                    + "-" + file.getOriginalFilename();
-
-            minioClient.putObject(
-                    PutObjectArgs.builder()
-                            .bucket(bucketName)
-                            .object(fileName)
-                            .stream(
-                                    file.getInputStream(),
-                                    file.getSize(),
-                                    -1
-                            )
-                            .contentType(file.getContentType())
-                            .build()
-            );
-
-            return minioClient.getPresignedObjectUrl(
-                    GetPresignedObjectUrlArgs.builder()
-                            .method(Method.GET)
-                            .bucket(bucketName)
-                            .object(fileName)
-                            .build()
-            );
-
-        } catch (Exception e) {
-            e.printStackTrace();
-            throw new RuntimeException("Upload avatar failed", e);
-        }
+        return minioService.uploadAvatar(file);
     }
 
     @Override
