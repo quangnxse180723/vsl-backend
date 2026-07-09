@@ -39,4 +39,13 @@ public interface AttemptHistoryRepository extends JpaRepository<AttemptHistory, 
     long countByUser_UserId(Long userId);
 
     long countByUser_UserIdAndIsCorrect(Long userId, boolean isCorrect);
+
+    /**
+     * Cac NGAY (khong tinh gio) ma nguoi dung co it nhat 1 lan luyen tap,
+     * sap xep moi nhat truoc. Dung de tinh chuoi ngay hoc (streak).
+     */
+    @Query(value = "SELECT DISTINCT CAST(attempted_at AS date) AS d " +
+                   "FROM attempt_history WHERE user_id = :userId ORDER BY d DESC",
+           nativeQuery = true)
+    List<java.time.LocalDate> findDistinctPracticeDates(@Param("userId") Long userId);
 }

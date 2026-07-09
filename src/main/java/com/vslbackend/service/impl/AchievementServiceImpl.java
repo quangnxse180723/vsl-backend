@@ -41,7 +41,7 @@ public class AchievementServiceImpl implements AchievementService {
         new AchievementDef(4L, "LEARNED_5",        "Nhập Môn",       "Học thuộc 5 từ vựng",                     "school"),
         new AchievementDef(5L, "LEARNED_20",       "Tiến Bộ",        "Học thuộc 20 từ vựng",                    "trending_up"),
         new AchievementDef(6L, "ALL_LEARNED",      "Đại Sư",         "Học thuộc tất cả từ vựng trong hệ thống", "emoji_events"),
-        new AchievementDef(7L, "PROFICIENCY_50",   "Nửa Đường",      "Đạt độ thành thạo 50%",                   "half_star"),
+        new AchievementDef(7L, "PROFICIENCY_50",   "Nửa Đường",      "Đạt độ thành thạo 50%",                   "star_half"),
         new AchievementDef(8L, "PROFICIENCY_100",  "Hoàn Hảo",       "Đạt độ thành thạo 100%",                  "stars")
     );
 

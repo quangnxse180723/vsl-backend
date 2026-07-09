@@ -31,4 +31,7 @@ USER spring
 
 EXPOSE 8080
 
-ENTRYPOINT ["java", "-jar", "app.jar"]
+# Chay JVM theo gio Viet Nam (UTC+7) de moc "ngay" cua streak & timestamp luyen tap
+# khop voi ngay thuc te cua nguoi dung, khong bi lech sang ngay hom truoc luc rang sang.
+# -Duser.timezone dung tzdb rieng cua JVM nen khong phu thuoc tzdata cua OS.
+ENTRYPOINT ["java", "-Duser.timezone=Asia/Ho_Chi_Minh", "-jar", "app.jar"]
