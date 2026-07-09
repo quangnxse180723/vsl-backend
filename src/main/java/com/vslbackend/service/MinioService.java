@@ -41,6 +41,9 @@ public class MinioService {
     @Value("${minio.bucket.avatars}")
     private String avatarBucket;
 
+    @Value("${minio.bucket.blog-thumbnails}")
+    private String blogThumbnailBucket;
+
     /**
      * Tao cac bucket neu chua ton tai va cau hinh chinh sach doc cong khai.
      * Loi MinIO khong cat startup cua ung dung - chi log warning.
@@ -51,6 +54,7 @@ public class MinioService {
         ensureBucketWithPublicRead(vocabularyImageBucket);
         ensureBucketWithPublicRead(categoryImageBucket);
         ensureBucketWithPublicRead(avatarBucket);
+        ensureBucketWithPublicRead(blogThumbnailBucket);
     }
 
     private void ensureBucketWithPublicRead(String bucket) {
@@ -298,6 +302,51 @@ public class MinioService {
             throw new AppException(
                     ErrorCode.MINIO_UPLOAD_ERROR,
                     "Upload avatar failed");
+        }
+    }
+
+    /**
+     * Upload thumbnail bai viet (blog) len bucket blog-thumbnails.
+     */
+    public String uploadBlogThumbnail(MultipartFile file, String objectName) {
+        try (InputStream is = file.getInputStream()) {
+            minioClient.putObject(
+                    PutObjectArgs.builder()
+                            .bucket(blogThumbnailBucket)
+                            .object(objectName)
+                            .stream(is, file.getSize(), -1)
+                            .contentType(file.getContentType() != null ? file.getContentType() : "image/jpeg")
+                            .build());
+
+            String url = buildPublicUrl(blogThumbnailBucket, objectName);
+            log.info("Uploaded blog thumbnail: {} -> {}", objectName, url);
+            return url;
+        } catch (Exception e) {
+            log.error("MinIO upload failed for blog thumbnail '{}': {}", objectName, e.getMessage(), e);
+            throw new AppException(ErrorCode.MINIO_UPLOAD_ERROR, "Loi tai len thumbnail: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Xoa thumbnail blog dua tren public URL.
+     */
+    public void deleteBlogThumbnailByUrl(String url) {
+        if (url == null || url.isBlank()) return;
+
+        String marker = "/" + blogThumbnailBucket + "/";
+        int idx = url.indexOf(marker);
+        if (idx < 0) return;
+
+        String objectName = url.substring(idx + marker.length());
+        try {
+            minioClient.removeObject(
+                    RemoveObjectArgs.builder()
+                            .bucket(blogThumbnailBucket)
+                            .object(objectName)
+                            .build());
+            log.info("Deleted MinIO blog thumbnail: {}", objectName);
+        } catch (Exception e) {
+            log.warn("Could not delete MinIO blog thumbnail '{}': {}", objectName, e.getMessage());
         }
     }
 
