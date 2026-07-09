@@ -57,7 +57,10 @@ public enum ErrorCode {
     // ----------------------- MINIO / STORAGE (STORE_5xxx) -----------------------
     MINIO_UPLOAD_ERROR("STORE_5001", "Khong the tai video len he thong luu tru", HttpStatus.INTERNAL_SERVER_ERROR),
     VOCABULARY_NOT_FOUND("STORE_5002", "Khong tim thay tu vung", HttpStatus.NOT_FOUND),
-    CATEGORY_NOT_FOUND("STORE_5003", "Khong tim thay danh muc", HttpStatus.NOT_FOUND);
+    CATEGORY_NOT_FOUND("STORE_5003", "Khong tim thay danh muc", HttpStatus.NOT_FOUND),
+
+    // ----------------------- BLOG (BLOG_6xxx) -----------------------
+    BLOG_NOT_FOUND("BLOG_6001", "Khong tim thay bai viet", HttpStatus.NOT_FOUND);
 
     private final String code;
     private final String message;
