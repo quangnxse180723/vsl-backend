@@ -18,4 +18,12 @@ public class BlogResponse {
     private String authorName;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+    // Tuong tac
+    private long likeCount;
+    private long commentCount;
+    private boolean likedByMe;
+
+    // Chi set khi status = REMOVED (bai bi admin go) - chi tac gia thay o "bai cua toi"
+    private String deletionReason;
 }

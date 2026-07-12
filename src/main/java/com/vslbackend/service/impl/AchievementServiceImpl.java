@@ -103,7 +103,7 @@ public class AchievementServiceImpl implements AchievementService {
         long correctAttempts = attemptHistoryRepository.countByUser_UserIdAndIsCorrect(userId, true);
         long learnedCount   = userProgressRepository.countByUser_UserIdAndLearningStatus(userId, LearningStatus.LEARNED);
         long totalVocabs    = vocabularyRepository.count();
-        int  proficiency    = computeProficiency(learnedCount, totalVocabs, correctAttempts, totalAttempts);
+        int  proficiency    = computeProficiency(learnedCount, totalVocabs);
 
         Map<String, Boolean> conditions = new LinkedHashMap<>();
         conditions.put("FIRST_STEP",     totalAttempts  >= 1);
@@ -134,10 +134,15 @@ public class AchievementServiceImpl implements AchievementService {
     //  Proficiency formula (also used by StatsService)
     //  60% weight = learned rate, 40% weight = accuracy rate
     // ──────────────────────────────────────────────────────────────
-    public static int computeProficiency(long learned, long totalVocabs,
-                                         long correct, long totalAttempts) {
-        double learnRate    = totalVocabs    > 0 ? (double) learned  / totalVocabs    : 0.0;
-        double accuracyRate = totalAttempts  > 0 ? (double) correct  / totalAttempts  : 0.0;
-        return (int) Math.round(learnRate * 60 + accuracyRate * 40);
+    /**
+     * % Chuong Trinh Hoc = ti le tu vung DA HOC (LEARNED) tren tong so tu vung.
+     * Chi tu da lam DUNG it nhat 1 lan (status LEARNED) moi duoc tinh; tu dang
+     * hoc (LEARNING, chua bao gio dung) hay chua dong cham toi (khong co
+     * UserProgress) deu KHONG duoc tinh vao %. Khong con tron voi ty le dung/sai
+     * tong the nhu truoc (do da gay hieu lam: luyen sai nhieu lan tu chua hoc
+     * cung lam % thay doi).
+     */
+    public static int computeProficiency(long learned, long totalVocabs) {
+        return totalVocabs > 0 ? (int) Math.round((double) learned / totalVocabs * 100) : 0;
     }
 }

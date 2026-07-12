@@ -87,16 +87,23 @@ services:
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
       # AI Model: mount volume chua file .onnx
       AI_MODEL_PATH: /app/models/mvitv2_small.onnx
+      # Gemini kiem duyet blog - key lay tu file .env (khong commit)
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
     volumes:
       - ./models:/app/models:ro
     ports:
       - "${SERVER_PORT:-8080}:8080"
     healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8080/api/health || exit 1"]
+      # Khong dung "--spider": busybox wget xu ly sai response chunked (khong co
+      # Content-Length) cua /api/health, bao loi "Auth Failed" gia du API tra 200 that.
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 -O /dev/null http://localhost:8080/api/health || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 5
-      start_period: 40s
+      # App mat toi ~3.5 phut de khoi dong (load model ONNX), start_period ngan hon
+      # se khien vai lan check dau bi tinh la fail that su -> container bao unhealthy.
+      start_period: 240s
     networks:
       - vsl-net
 

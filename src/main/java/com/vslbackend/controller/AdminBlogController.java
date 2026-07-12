@@ -3,7 +3,12 @@ package com.vslbackend.controller;
 import com.vslbackend.dto.request.admin.AdminCreateBlogRequest;
 import com.vslbackend.dto.request.admin.AdminUpdateBlogRequest;
 import com.vslbackend.dto.response.BlogResponse;
+import com.vslbackend.dto.response.CommentResponse;
+import com.vslbackend.dto.response.LikeUserResponse;
+import com.vslbackend.service.inter.BlogEngagementService;
 import com.vslbackend.service.inter.BlogService;
+
+import java.util.List;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -26,18 +31,33 @@ import com.vslbackend.exception.ErrorCode;
 public class AdminBlogController {
 
     private final BlogService blogService;
+    private final BlogEngagementService engagementService;
     private final UserRepository userRepository;
 
     @GetMapping
     public ResponseEntity<Page<BlogResponse>> getAllBlogs(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
-        return ResponseEntity.ok(blogService.getAllBlogs(page, size));
+            @RequestParam(defaultValue = "10") int size,
+            Authentication authentication) {
+        Long adminId = resolveUserId(authentication);
+        return ResponseEntity.ok(blogService.getAllBlogs(page, size, adminId));
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<BlogResponse> getBlogById(@PathVariable Long id) {
         return ResponseEntity.ok(blogService.getBlogById(id));
+    }
+
+    /** Danh sach binh luan that cua bai (admin xem chi tiet). */
+    @GetMapping("/{id}/comments")
+    public ResponseEntity<List<CommentResponse>> getBlogComments(@PathVariable Long id) {
+        return ResponseEntity.ok(engagementService.getComments(id));
+    }
+
+    /** Danh sach nguoi da thich bai (admin xem chi tiet). */
+    @GetMapping("/{id}/likes")
+    public ResponseEntity<List<LikeUserResponse>> getBlogLikers(@PathVariable Long id) {
+        return ResponseEntity.ok(engagementService.getLikers(id));
     }
 
     @PostMapping

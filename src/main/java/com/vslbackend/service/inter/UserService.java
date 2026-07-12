@@ -7,7 +7,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import com.vslbackend.dto.request.admin.AdminCreateUserRequest;
 import com.vslbackend.dto.request.admin.AdminUpdateUserRequest;
 
 @Service
@@ -30,9 +29,8 @@ public interface UserService {
 
     UserResponse getUserById(Long id);
 
-    UserResponse createUser(AdminCreateUserRequest request);
-
-    UserResponse updateUser(Long id, AdminUpdateUserRequest request);
+    // Chi cap nhat trang thai hoat dong (ACTIVE/INACTIVE), khong sua thong tin tai khoan
+    UserResponse updateUserStatus(Long id, AdminUpdateUserRequest request);
 
     void deleteUser(Long id); // Soft delete
 }

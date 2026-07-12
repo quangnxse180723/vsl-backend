@@ -34,6 +34,10 @@ public class Blog {
     @Builder.Default
     private BlogStatus status = BlogStatus.DRAFT;
 
+    /** Ly do admin go bai (chi set khi status = REMOVED). Chi tac gia duoc thay. */
+    @Column(name = "deletion_reason", length = 1000)
+    private String deletionReason;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "author_id")
     private User author;

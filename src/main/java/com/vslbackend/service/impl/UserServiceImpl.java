@@ -21,12 +21,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import com.vslbackend.dto.request.admin.AdminCreateUserRequest;
 import com.vslbackend.dto.request.admin.AdminUpdateUserRequest;
-import com.vslbackend.entity.Role;
 import com.vslbackend.entity.UserStatus;
-
-import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -110,33 +106,12 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public UserResponse createUser(AdminCreateUserRequest request) {
-        if (userRepository.findByEmail(request.getEmail()).isPresent()) {
-            throw new RuntimeException("Email already exists");
-        }
-        User user = User.builder()
-                .username(request.getUsername())
-                .email(request.getEmail())
-                .passwordHash(passwordEncoder.encode(request.getPassword()))
-                .fullName(request.getFullName())
-                .role(request.getRole() != null ? request.getRole() : Role.USER)
-                .status(request.getStatus() != null ? request.getStatus() : UserStatus.ACTIVE)
-                .build();
-        userRepository.save(user);
-        return mapToUserResponse(user);
-    }
-
-    @Override
-    public UserResponse updateUser(Long id, AdminUpdateUserRequest request) {
+    public UserResponse updateUserStatus(Long id, AdminUpdateUserRequest request) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("User not found"));
-        
-        if (request.getFullName() != null) user.setFullName(request.getFullName());
-        if (request.getRole() != null) user.setRole(request.getRole());
+
+        // Admin chi duoc bat/tat trang thai hoat dong, khong sua ten/vai tro/mat khau
         if (request.getStatus() != null) user.setStatus(request.getStatus());
-        if (request.getPassword() != null && !request.getPassword().isEmpty()) {
-            user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
-        }
         userRepository.save(user);
         return mapToUserResponse(user);
     }
@@ -159,6 +134,7 @@ public class UserServiceImpl implements UserService {
                 .role(user.getRole())
                 .status(user.getStatus())
                 .createdAt(user.getCreatedAt())
+                .lastLogin(user.getLastLogin())
                 .build();
     }
 

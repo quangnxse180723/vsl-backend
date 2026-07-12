@@ -9,12 +9,18 @@ import org.springframework.data.domain.Page;
 import org.springframework.web.multipart.MultipartFile;
 
 public interface BlogService {
-    Page<BlogResponse> getAllBlogs(int page, int size);
-    Page<BlogResponse> getPublishedBlogs(int page, int size);
+    /** Danh sach blog cho admin: bai nhap chi hien cua chinh admin dang xem. */
+    Page<BlogResponse> getAllBlogs(int page, int size, Long adminId);
+    Page<BlogResponse> getPublishedBlogs(int page, int size, Long currentUserId);
+    /** Chi tiet cong khai: an bai da bi go (REMOVED). */
+    BlogResponse getPublicBlogById(Long id, Long currentUserId);
+    /** Chi tiet noi bo (admin) - tra ve bat ke trang thai. */
     BlogResponse getBlogById(Long id);
     BlogResponse createBlog(AdminCreateBlogRequest request, Long authorId);
     BlogResponse updateBlog(Long id, AdminUpdateBlogRequest request);
     void deleteBlog(Long id);
+    /** Admin go bai (do vi pham) - chuyen REMOVED + luu ly do cho tac gia. */
+    void removeBlogByAdmin(Long id, String reason);
     String uploadThumbnail(Long id, MultipartFile image);
 
     // User-specific methods

@@ -18,4 +18,5 @@ public class UserResponse {
     private final Role role;
     private final com.vslbackend.entity.UserStatus status;
     private final LocalDateTime createdAt;
+    private final LocalDateTime lastLogin;
 }

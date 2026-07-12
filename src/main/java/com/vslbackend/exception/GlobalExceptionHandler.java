@@ -7,6 +7,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -44,6 +45,15 @@ public class GlobalExceptionHandler {
 
         ErrorCode ec = ErrorCode.VALIDATION_ERROR;
         return build(ec.getStatus(), ec.name(), ec.getCode(), ec.getMessage(), request, fieldErrors);
+    }
+
+    /** Tai khoan bi admin vo hieu hoa (INACTIVE) co dang nhap - nem tu AuthenticationManager
+     *  vi CustomUserDetails.isEnabled() = false. Phai khai bao rieng, cu the hon
+     *  AuthenticationException, de Spring uu tien handler nay thay vi loi chung chung ben duoi. */
+    @ExceptionHandler(DisabledException.class)
+    public ResponseEntity<ErrorResponse> handleDisabledAccount(DisabledException ex, HttpServletRequest request) {
+        ErrorCode ec = ErrorCode.ACCOUNT_DISABLED;
+        return build(ec.getStatus(), ec.name(), ec.getCode(), ec.getMessage(), request, null);
     }
 
     /** Sai email/mat khau khi dang nhap (nem tu AuthenticationManager). */

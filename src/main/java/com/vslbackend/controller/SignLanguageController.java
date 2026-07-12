@@ -263,6 +263,47 @@ public class SignLanguageController {
      * Authorization: Bearer {adminToken}
      * </pre>
      */
+    /**
+     * Cap nhat thong tin chu cua tu vung (word, category, description).
+     * Video/anh/expectedId dung cac endpoint upload rieng.
+     *
+     * <pre>
+     * PUT /api/admin/vocabulary/{id}
+     * Body: { "categoryId": 1, "word": "con cho", "description": "..." }
+     * </pre>
+     */
+    @PutMapping(value = "/api/admin/vocabulary/{id}", consumes = MediaType.APPLICATION_JSON_VALUE)
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<VocabularyResponse>> updateVocabulary(
+            @PathVariable Long id,
+            @Valid @RequestBody CreateVocabularyRequest request) {
+
+        Vocabulary vocabulary = vocabularyRepository.findById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.VOCABULARY_NOT_FOUND));
+        Category category = categoryRepository.findById(request.getCategoryId())
+                .orElseThrow(() -> new AppException(ErrorCode.CATEGORY_NOT_FOUND));
+
+        vocabulary.setCategory(category);
+        vocabulary.setWord(request.getWord());
+        vocabulary.setDescription(request.getDescription());
+        vocabulary = vocabularyRepository.save(vocabulary);
+
+        log.info("Admin updated vocabulary id={}, word='{}'", vocabulary.getId(), vocabulary.getWord());
+
+        VocabularyResponse response = VocabularyResponse.builder()
+                .id(vocabulary.getId())
+                .categoryId(category.getId())
+                .categoryName(category.getName())
+                .word(vocabulary.getWord())
+                .description(vocabulary.getDescription())
+                .videoTutorialUrl(vocabulary.getVideoTutorialUrl())
+                .imageUrl(vocabulary.getImageUrl())
+                .expectedId(vocabulary.getExpectedId())
+                .build();
+
+        return ResponseEntity.ok(ApiResponse.of("Cap nhat tu vung thanh cong", response));
+    }
+
     @DeleteMapping("/api/admin/vocabulary/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deleteVocabulary(@PathVariable Long id) {

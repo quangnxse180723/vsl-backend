@@ -41,6 +41,9 @@ public class User {
     @Builder.Default
     private UserStatus status = UserStatus.ACTIVE;
 
+    @Column(name = "last_login")
+    private LocalDateTime lastLogin;
+
     @CreationTimestamp
     @Column(name = "created_at")
     private LocalDateTime createdAt;

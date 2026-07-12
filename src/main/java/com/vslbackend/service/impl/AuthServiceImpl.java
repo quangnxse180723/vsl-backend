@@ -63,6 +63,10 @@ public class AuthServiceImpl implements AuthService {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new AppException(ErrorCode.INVALID_CREDENTIALS));
 
+        // Ghi lai thoi diem dang nhap gan nhat de admin theo doi hoat dong thuc te
+        user.setLastLogin(java.time.LocalDateTime.now());
+        userRepository.save(user);
+
         return buildAuthResponse(user);
     }
 
@@ -112,6 +116,7 @@ public class AuthServiceImpl implements AuthService {
                 .avatarUrl(user.getAvatarUrl())
                 .role(user.getRole())
                 .createdAt(user.getCreatedAt())
+                .lastLogin(user.getLastLogin())
                 .build();
     }
 }

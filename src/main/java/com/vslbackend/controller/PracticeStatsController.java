@@ -52,8 +52,7 @@ public class PracticeStatsController {
                 ? Math.round((double) correctAttempts / totalAttempts * 10000.0) / 100.0
                 : 0.0;
 
-        int proficiency = AchievementServiceImpl.computeProficiency(
-                learnedCount, totalVocabs, correctAttempts, totalAttempts);
+        int proficiency = AchievementServiceImpl.computeProficiency(learnedCount, totalVocabs);
 
         List<LocalDate> practiceDates = attemptHistoryRepository.findDistinctPracticeDates(userId);
         StreakResult streak = computeStreak(practiceDates, LocalDate.now());

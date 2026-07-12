@@ -1,6 +1,5 @@
 package com.vslbackend.controller;
 
-import com.vslbackend.dto.request.admin.AdminCreateUserRequest;
 import com.vslbackend.dto.request.admin.AdminUpdateUserRequest;
 import com.vslbackend.dto.response.UserResponse;
 import com.vslbackend.service.inter.UserService;
@@ -33,14 +32,11 @@ public class AdminUserController {
         return ResponseEntity.ok(userService.getUserById(id));
     }
 
-    @PostMapping
-    public ResponseEntity<UserResponse> createUser(@RequestBody AdminCreateUserRequest request) {
-        return ResponseEntity.ok(userService.createUser(request));
-    }
-
+    // Admin chi duoc bat/tat trang thai hoat dong (ACTIVE/INACTIVE),
+    // khong duoc chinh sua thong tin tai khoan (ten, vai tro, mat khau).
     @PutMapping("/{id}")
-    public ResponseEntity<UserResponse> updateUser(@PathVariable Long id, @RequestBody AdminUpdateUserRequest request) {
-        return ResponseEntity.ok(userService.updateUser(id, request));
+    public ResponseEntity<UserResponse> updateUserStatus(@PathVariable Long id, @RequestBody AdminUpdateUserRequest request) {
+        return ResponseEntity.ok(userService.updateUserStatus(id, request));
     }
 
     @DeleteMapping("/{id}")

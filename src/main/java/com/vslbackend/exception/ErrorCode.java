@@ -36,6 +36,7 @@ public enum ErrorCode {
     INVALID_CREDENTIALS("AUTH_1003", "Email hoac mat khau khong dung", HttpStatus.UNAUTHORIZED),
     UNAUTHENTICATED("AUTH_1004", "Ban can dang nhap de truy cap tai nguyen nay", HttpStatus.UNAUTHORIZED),
     ACCESS_DENIED("AUTH_1005", "Ban khong co quyen truy cap tai nguyen nay", HttpStatus.FORBIDDEN),
+    ACCOUNT_DISABLED("AUTH_1006", "Tai khoan cua ban da bi quan tri vien vo hieu hoa", HttpStatus.FORBIDDEN),
 
     // ----------------------- TOKEN -----------------------
     INVALID_TOKEN("TOKEN_2001", "Token khong hop le", HttpStatus.UNAUTHORIZED),
@@ -60,7 +61,13 @@ public enum ErrorCode {
     CATEGORY_NOT_FOUND("STORE_5003", "Khong tim thay danh muc", HttpStatus.NOT_FOUND),
 
     // ----------------------- BLOG (BLOG_6xxx) -----------------------
-    BLOG_NOT_FOUND("BLOG_6001", "Khong tim thay bai viet", HttpStatus.NOT_FOUND);
+    BLOG_NOT_FOUND("BLOG_6001", "Khong tim thay bai viet", HttpStatus.NOT_FOUND),
+    BLOG_REJECTED("BLOG_6002", "Bai viet khong duoc AI phe duyet", HttpStatus.UNPROCESSABLE_ENTITY),
+    MODERATION_ERROR("BLOG_6003", "Khong the kiem duyet bai viet luc nay, vui long thu lai sau", HttpStatus.SERVICE_UNAVAILABLE),
+    COMMENT_NOT_FOUND("BLOG_6004", "Khong tim thay binh luan", HttpStatus.NOT_FOUND),
+    REPORT_NOT_FOUND("BLOG_6005", "Khong tim thay don to cao", HttpStatus.NOT_FOUND),
+    ALREADY_REPORTED("BLOG_6006", "Ban da to cao bai viet nay roi", HttpStatus.CONFLICT),
+    CANNOT_REPORT_OWN_BLOG("BLOG_6007", "Ban khong the to cao bai viet cua chinh minh", HttpStatus.BAD_REQUEST);
 
     private final String code;
     private final String message;

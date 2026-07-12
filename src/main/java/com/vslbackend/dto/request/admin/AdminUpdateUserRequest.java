@@ -1,13 +1,10 @@
 package com.vslbackend.dto.request.admin;
 
-import com.vslbackend.entity.Role;
 import com.vslbackend.entity.UserStatus;
 import lombok.Data;
 
+/** Admin chi duoc phep bat/tat trang thai hoat dong cua tai khoan. */
 @Data
 public class AdminUpdateUserRequest {
-    private String fullName;
-    private Role role;
     private UserStatus status;
-    private String password; // Optional
 }

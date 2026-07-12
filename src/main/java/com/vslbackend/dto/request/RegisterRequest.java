@@ -25,7 +25,7 @@ public class RegisterRequest {
     private String fullName;
 
     @NotBlank(message = "Mat khau khong duoc de trong")
-    @Size(min = 8, max = 72, message = "Mat khau phai tu 8 den 72 ky tu")
+    @Size(min = 8, max = 12, message = "Mat khau phai tu 8 den 12 ky tu")
     @Pattern(
             regexp = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).+$",
             message = "Mat khau phai chua chu thuong, chu hoa va so"
