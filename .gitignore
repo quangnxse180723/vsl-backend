@@ -37,6 +37,7 @@ build/
 
 ### Secrets ###
 .env
+.env.*
 !.env.example
 
 ### Local notes / Postman collection (chua thong tin nhay cam, khong push) ###

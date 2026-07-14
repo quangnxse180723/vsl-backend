@@ -67,3 +67,22 @@ jobs:
             ghcr.io/${{ github.repository }}:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # Sau khi image moi da len GHCR, SSH vao VM production, pull ve va restart
+  # service "app" (khong dung toi postgres/minio dang chay).
+  deploy:
+    name: Deploy to Azure VM
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          script: |
+            cd ~/vsl-backend
+            docker compose pull app
+            docker compose up -d app
+            docker image prune -f
