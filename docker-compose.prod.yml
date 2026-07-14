@@ -1,8 +1,9 @@
 # ============================================================================
 #  Docker Compose PRODUCTION: dung image da build san tu GHCR (khong build local).
-#  Chi expose port can thiet ra internet: 8080 (backend) va 9000 (MinIO S3 API,
-#  can public vi browser load video/anh truc tiep tu day). Postgres va MinIO
-#  console KHONG expose ra ngoai - chi truy cap qua SSH tunnel khi can.
+#  Chi Caddy (80/443) expose ra internet, tu dong xin/gia han HTTPS qua
+#  Let's Encrypt (xem Caddyfile). App (8080) va MinIO (9000) khong publish
+#  port ra host nua - Caddy reverse-proxy toi chung qua Docker network noi bo.
+#  Postgres va MinIO console van KHONG expose ra ngoai - chi qua SSH tunnel.
 # ============================================================================
 services:
   postgres:
@@ -31,8 +32,6 @@ services:
     environment:
       MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
       MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
-    ports:
-      - "9000:9000"   # S3 API - can public de browser load video/anh
     command: server /data --console-address ":9001"
     volumes:
       - minio_data:/data
@@ -72,8 +71,6 @@ services:
       GEMINI_ENABLED: ${GEMINI_ENABLED:-false}
     volumes:
       - ./models:/app/models:ro
-    ports:
-      - "8080:8080"
     healthcheck:
       test: ["CMD-SHELL", "wget --no-verbose --tries=1 -O /dev/null http://localhost:8080/api/health || exit 1"]
       interval: 15s
@@ -83,9 +80,28 @@ services:
     networks:
       - vsl-net
 
+  caddy:
+    image: caddy:2-alpine
+    container_name: vsl-caddy
+    restart: unless-stopped
+    depends_on:
+      - app
+      - minio
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - vsl-net
+
 volumes:
   vsl-pgdata:
   minio_data:
+  caddy_data:
+  caddy_config:
 
 networks:
   vsl-net:
