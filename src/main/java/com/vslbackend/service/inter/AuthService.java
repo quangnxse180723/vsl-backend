@@ -11,6 +11,9 @@ public interface AuthService {
     /** Dang ky tai khoan moi (role USER). */
     UserResponse register(RegisterRequest request);
 
+    /** Yeu cau gui ma OTP xac thuc email khi dang ky. */
+    void sendRegisterOtp(com.vslbackend.dto.request.auth.SendRegisterOtpRequest request);
+
     /** Dang nhap, tra ve access + refresh token. */
     AuthResponse login(LoginRequest request);
 

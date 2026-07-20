@@ -36,12 +36,30 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     @Transactional
+    public void sendRegisterOtp(com.vslbackend.dto.request.auth.SendRegisterOtpRequest request) {
+        if (userRepository.existsByEmail(request.getEmail())) {
+            throw new AppException(ErrorCode.EMAIL_ALREADY_EXISTS);
+        }
+        if (userRepository.existsByUsername(request.getUsername())) {
+            throw new AppException(ErrorCode.USERNAME_ALREADY_EXISTS);
+        }
+        
+        String otp = otpService.generateAndStoreOtp(request.getEmail());
+        emailService.sendOtpEmail(request.getEmail(), otp);
+    }
+
+    @Override
+    @Transactional
     public UserResponse register(RegisterRequest request) {
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new AppException(ErrorCode.EMAIL_ALREADY_EXISTS);
         }
         if (userRepository.existsByUsername(request.getUsername())) {
             throw new AppException(ErrorCode.USERNAME_ALREADY_EXISTS);
+        }
+        
+        if (!otpService.verifyOtp(request.getEmail(), request.getOtp())) {
+            throw new AppException(ErrorCode.INVALID_CREDENTIALS); // hoac co the dung ma loi rieng INVALID_OTP
         }
 
         User user = User.builder()
@@ -52,7 +70,10 @@ public class AuthServiceImpl implements AuthService {
                 .role(Role.USER)
                 .build();
 
-        return toUserResponse(userRepository.save(user));
+        User savedUser = userRepository.save(user);
+        otpService.clearOtp(request.getEmail());
+        
+        return toUserResponse(savedUser);
     }
 
     @Override

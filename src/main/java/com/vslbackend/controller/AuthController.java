@@ -22,6 +22,12 @@ public class AuthController {
 
     private final AuthService authService;
 
+    @PostMapping("/send-register-otp")
+    public ResponseEntity<ApiResponse<Void>> sendRegisterOtp(@Valid @RequestBody com.vslbackend.dto.request.auth.SendRegisterOtpRequest request) {
+        authService.sendRegisterOtp(request);
+        return ResponseEntity.ok(ApiResponse.of("Da gui ma OTP den email cua ban"));
+    }
+
     @PostMapping("/register")
     public ResponseEntity<ApiResponse<UserResponse>> register(@Valid @RequestBody RegisterRequest request) {
         UserResponse user = authService.register(request);

@@ -31,4 +31,7 @@ public class RegisterRequest {
             message = "Mat khau phai chua chu thuong, chu hoa va so"
     )
     private String password;
+
+    @NotBlank(message = "Ma OTP khong duoc de trong")
+    private String otp;
 }

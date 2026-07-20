@@ -25,35 +25,45 @@ class AuthIntegrationTest {
     @Autowired
     private MockMvc mockMvc;
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    @Autowired
+    private com.vslbackend.service.inter.OtpService otpService;
 
-    private static final String REGISTER_BODY = """
-            {"username":"johndoe","email":"john@example.com","fullName":"John Doe","password":"Password1"}
-            """;
-    private static final String LOGIN_BODY = """
-            {"email":"john@example.com","password":"Password1"}
-            """;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
     void fullAuthFlow_shouldWork() throws Exception {
+        // Generate OTP for john
+        String otp = otpService.generateAndStoreOtp("john@example.com");
+        String registerBody = """
+                {"username":"johndoe","email":"john@example.com","fullName":"John Doe","password":"Password1","otp":"%s"}
+                """.formatted(otp);
+
         // 1) Dang ky thanh cong -> 201, role USER
         mockMvc.perform(post("/api/auth/register")
-                        .contentType(MediaType.APPLICATION_JSON).content(REGISTER_BODY))
+                        .contentType(MediaType.APPLICATION_JSON).content(registerBody))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.email").value("john@example.com"))
                 .andExpect(jsonPath("$.data.role").value("USER"));
 
         // 2) Dang ky trung email -> 409 AUTH_1001
+        String otp2 = otpService.generateAndStoreOtp("john@example.com");
+        String registerBody2 = """
+                {"username":"johndoe","email":"john@example.com","fullName":"John Doe","password":"Password1","otp":"%s"}
+                """.formatted(otp2);
+
         mockMvc.perform(post("/api/auth/register")
-                        .contentType(MediaType.APPLICATION_JSON).content(REGISTER_BODY))
+                        .contentType(MediaType.APPLICATION_JSON).content(registerBody2))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("AUTH_1001"))
                 .andExpect(jsonPath("$.error").value("EMAIL_ALREADY_EXISTS"));
 
         // 3) Dang nhap -> 200, co access + refresh token
+        String loginBody = """
+                {"email":"john@example.com","password":"Password1"}
+                """;
         MvcResult loginResult = mockMvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON).content(LOGIN_BODY))
+                        .contentType(MediaType.APPLICATION_JSON).content(loginBody))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.accessToken").isNotEmpty())
                 .andExpect(jsonPath("$.data.refreshToken").isNotEmpty())
@@ -89,11 +99,12 @@ class AuthIntegrationTest {
 
     @Test
     void login_wrongPassword_shouldReturn401() throws Exception {
+        String otp = otpService.generateAndStoreOtp("alice@example.com");
         mockMvc.perform(post("/api/auth/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
-                        {"username":"alice","email":"alice@example.com","fullName":"Alice","password":"Password1"}
-                        """));
+                        {"username":"alice","email":"alice@example.com","fullName":"Alice","password":"Password1","otp":"%s"}
+                        """.formatted(otp)));
 
         mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)

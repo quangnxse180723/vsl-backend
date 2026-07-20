@@ -90,6 +90,9 @@ services:
       # Gemini kiem duyet blog - key lay tu file .env (khong commit)
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
+      # Mail config cho chuc nang quen mat khau
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
     volumes:
       - ./models:/app/models:ro
     ports:
