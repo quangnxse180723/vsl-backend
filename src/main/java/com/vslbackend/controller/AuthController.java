@@ -53,4 +53,22 @@ public class AuthController {
         UserResponse user = authService.getCurrentUser(principal.getUsername());
         return ResponseEntity.ok(ApiResponse.of("Thong tin tai khoan", user));
     }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<ApiResponse<Void>> forgotPassword(@Valid @RequestBody com.vslbackend.dto.request.auth.ForgotPasswordRequest request) {
+        authService.forgotPassword(request);
+        return ResponseEntity.ok(ApiResponse.of("Da gui ma OTP den email cua ban"));
+    }
+
+    @PostMapping("/verify-otp")
+    public ResponseEntity<ApiResponse<Void>> verifyOtp(@Valid @RequestBody com.vslbackend.dto.request.auth.VerifyOtpRequest request) {
+        authService.verifyOtp(request);
+        return ResponseEntity.ok(ApiResponse.of("Xac thuc OTP thanh cong"));
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<ApiResponse<Void>> resetPassword(@Valid @RequestBody com.vslbackend.dto.request.auth.ResetPasswordRequest request) {
+        authService.resetPassword(request);
+        return ResponseEntity.ok(ApiResponse.of("Dat lai mat khau thanh cong"));
+    }
 }

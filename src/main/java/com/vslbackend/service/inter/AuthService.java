@@ -22,4 +22,13 @@ public interface AuthService {
 
     /** Lay thong tin nguoi dung dang dang nhap. */
     UserResponse getCurrentUser(String email);
+
+    /** Yeu cau gui ma OTP de khoi phuc mat khau. */
+    void forgotPassword(com.vslbackend.dto.request.auth.ForgotPasswordRequest request);
+
+    /** Kiem tra ma OTP hop le. */
+    void verifyOtp(com.vslbackend.dto.request.auth.VerifyOtpRequest request);
+
+    /** Dat lai mat khau moi. */
+    void resetPassword(com.vslbackend.dto.request.auth.ResetPasswordRequest request);
 }

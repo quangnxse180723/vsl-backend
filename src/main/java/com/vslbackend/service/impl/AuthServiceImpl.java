@@ -31,6 +31,8 @@ public class AuthServiceImpl implements AuthService {
     private final AuthenticationManager authenticationManager;
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
+    private final com.vslbackend.service.inter.OtpService otpService;
+    private final com.vslbackend.service.inter.EmailService emailService;
 
     @Override
     @Transactional
@@ -91,6 +93,41 @@ public class AuthServiceImpl implements AuthService {
         return userRepository.findByEmail(email)
                 .map(this::toUserResponse)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+    }
+
+    @Override
+    @Transactional
+    public void forgotPassword(com.vslbackend.dto.request.auth.ForgotPasswordRequest request) {
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        
+        String otp = otpService.generateAndStoreOtp(user.getEmail());
+        emailService.sendOtpEmail(user.getEmail(), otp);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public void verifyOtp(com.vslbackend.dto.request.auth.VerifyOtpRequest request) {
+        if (!otpService.verifyOtp(request.getEmail(), request.getOtp())) {
+            throw new AppException(ErrorCode.INVALID_CREDENTIALS); // Hoac tao ErrorCode moi INVALID_OTP
+        }
+        // OTP hợp lệ thì giữ lại để lúc đổi password kiểm tra tiếp, verify xong chưa được đổi vội.
+    }
+
+    @Override
+    @Transactional
+    public void resetPassword(com.vslbackend.dto.request.auth.ResetPasswordRequest request) {
+        if (!otpService.verifyOtp(request.getEmail(), request.getOtp())) {
+            throw new AppException(ErrorCode.INVALID_CREDENTIALS);
+        }
+        
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+                
+        user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+        
+        otpService.clearOtp(request.getEmail());
     }
 
     // ------------------------------------------------------------------
