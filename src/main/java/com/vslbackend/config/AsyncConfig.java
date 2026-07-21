@@ -28,6 +28,7 @@ import java.util.concurrent.RejectedExecutionException;
 @Slf4j
 @Configuration
 @EnableAsync
+@org.springframework.scheduling.annotation.EnableScheduling
 public class AsyncConfig implements AsyncConfigurer {
 
     @Bean(name = "aiTaskExecutor")

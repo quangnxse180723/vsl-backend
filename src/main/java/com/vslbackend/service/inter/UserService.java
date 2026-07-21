@@ -33,4 +33,6 @@ public interface UserService {
     UserResponse updateUserStatus(Long id, AdminUpdateUserRequest request);
 
     void deleteUser(Long id); // Soft delete
+
+    UserResponse updateNotificationSettings(boolean emailNotificationsEnabled);
 }

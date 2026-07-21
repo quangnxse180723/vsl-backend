@@ -124,6 +124,14 @@ public class UserServiceImpl implements UserService {
         userRepository.save(user);
     }
 
+    @Override
+    public UserResponse updateNotificationSettings(boolean emailNotificationsEnabled) {
+        User user = getCurrentUserEntity();
+        user.setEmailNotificationsEnabled(emailNotificationsEnabled);
+        userRepository.save(user);
+        return mapToUserResponse(user);
+    }
+
     private UserResponse mapToUserResponse(User user) {
         return UserResponse.builder()
                 .userId(user.getUserId())
@@ -135,6 +143,7 @@ public class UserServiceImpl implements UserService {
                 .status(user.getStatus())
                 .createdAt(user.getCreatedAt())
                 .lastLogin(user.getLastLogin())
+                .emailNotificationsEnabled(user.isEmailNotificationsEnabled())
                 .build();
     }
 

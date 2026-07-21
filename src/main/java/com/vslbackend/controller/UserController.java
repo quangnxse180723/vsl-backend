@@ -58,4 +58,10 @@ public class UserController {
         return ResponseEntity.ok(
                 userService.updateAvatar(request.getAvatarUrl()));
     }
+
+    @PatchMapping("/me/notifications")
+    public ResponseEntity<UserResponse> updateNotificationSettings(
+            @RequestParam boolean emailNotificationsEnabled) {
+        return ResponseEntity.ok(userService.updateNotificationSettings(emailNotificationsEnabled));
+    }
 }

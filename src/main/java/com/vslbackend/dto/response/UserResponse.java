@@ -19,4 +19,5 @@ public class UserResponse {
     private final com.vslbackend.entity.UserStatus status;
     private final LocalDateTime createdAt;
     private final LocalDateTime lastLogin;
+    private final boolean emailNotificationsEnabled;
 }

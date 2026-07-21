@@ -73,7 +73,7 @@ public class PracticeStatsController {
     }
 
     /** Ket qua tinh chuoi ngay hoc. */
-    record StreakResult(int current, int longest, List<Boolean> week) {}
+    public record StreakResult(int current, int longest, List<Boolean> week) {}
 
     /**
      * Tinh chuoi ngay hoc tu danh sach cac ngay co luyen tap (da sap xep moi -> cu).
@@ -83,7 +83,7 @@ public class PracticeStatsController {
      * - longest: chuoi dai nhat trong toan bo lich su.
      * - week: 7 ngay gan nhat (index 0 = 6 ngay truoc ... index 6 = hom nay), true = co hoc.
      */
-    static StreakResult computeStreak(List<LocalDate> datesDesc, LocalDate today) {
+    public static StreakResult computeStreak(List<LocalDate> datesDesc, LocalDate today) {
         Set<LocalDate> daySet = new HashSet<>(datesDesc);
         List<Boolean> week = new ArrayList<>(7);
         for (int i = 6; i >= 0; i--) {

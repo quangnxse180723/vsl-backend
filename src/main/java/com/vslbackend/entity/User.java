@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
@@ -43,6 +44,19 @@ public class User {
 
     @Column(name = "last_login")
     private LocalDateTime lastLogin;
+
+    /** Mac dinh TAT - nguoi dung phai tu BAT de nhan email nhac nho streak. */
+    @Column(name = "email_notifications_enabled", nullable = false)
+    @Builder.Default
+    private boolean emailNotificationsEnabled = false;
+
+    /**
+     * Ngay da gui mail nhac nho streak lan cuoi.
+     * Dung de dam bao chi gui DUNG 1 LAN moi ngay, du cron job chay nhieu lan.
+     * Set ve null khi nguoi dung hoc xong (streak duoc tinh ngay hom nay).
+     */
+    @Column(name = "streak_reminder_sent_date")
+    private LocalDate streakReminderSentDate;
 
     @CreationTimestamp
     @Column(name = "created_at")
