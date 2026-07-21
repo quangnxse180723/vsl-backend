@@ -92,6 +92,7 @@ services:
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
       # Mail config cho chuc nang quen mat khau (Bay gio dung Resend API)
       RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-SignMentor <onboarding@resend.dev>}
     volumes:
       - ./models:/app/models:ro
     ports:

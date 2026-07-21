@@ -22,6 +22,9 @@ public class EmailServiceImpl implements EmailService {
     @Value("${RESEND_API_KEY:}")
     private String resendApiKey;
 
+    @Value("${RESEND_FROM_EMAIL:SignMentor <onboarding@resend.dev>}")
+    private String fromEmail;
+
     private final RestTemplate restTemplate = new RestTemplate();
 
     @Async
@@ -52,10 +55,9 @@ public class EmailServiceImpl implements EmailService {
             headers.setContentType(MediaType.APPLICATION_JSON);
             headers.setBearerAuth(resendApiKey);
 
-            // Resend only allows sending FROM onboarding@resend.dev until you verify a domain.
-            // And you can only send TO the email address you registered Resend with.
+            // Resend requires the "from" email to be a verified domain, or onboarding@resend.dev for testing.
             Map<String, Object> body = Map.of(
-                    "from", "SignMentor <onboarding@resend.dev>",
+                    "from", fromEmail,
                     "to", List.of(toEmail),
                     "subject", "Mã Xác Thực OTP - SignMentor",
                     "html", htmlContent
