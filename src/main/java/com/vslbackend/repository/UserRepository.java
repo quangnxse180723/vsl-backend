@@ -35,11 +35,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
           AND EXISTS (
               SELECT 1 FROM AttemptHistory a
               WHERE a.user = u
-                AND CAST(a.attemptedAt AS date) = :yesterday
-          )
-          AND NOT EXISTS (
-              SELECT 1 FROM AttemptHistory a
-              WHERE a.user = u
                 AND CAST(a.attemptedAt AS date) = :today
           )
     """)

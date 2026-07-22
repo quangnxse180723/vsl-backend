@@ -40,24 +40,18 @@ public class StreakReminderScheduler {
     private final EmailService           emailService;
 
     /**
-     * Chay moi gio, kiem tra xem co phai gio nhac nho khong (19h gio VN).
-     * Cron: "0 0 * * * *" = phut 0, giay 0 cua moi gio.
+     * CHAY DEMO: Chay moi phut
      */
-    @Scheduled(cron = "0 0 * * * *")
+    @Scheduled(cron = "0 * * * * *")
     @Transactional
     public void sendStreakReminders() {
         ZonedDateTime nowVn = ZonedDateTime.now(VIETNAM_ZONE);
         int currentHour = nowVn.getHour();
 
-        // Chi gui mail vao dung gio 19h gio Viet Nam (con 5 gio den 0h reset)
-        if (currentHour != REMINDER_HOUR_VN) {
-            return;
-        }
-
         LocalDate today = nowVn.toLocalDate();
         LocalDate yesterday = today.minusDays(1);
 
-        log.info("[StreakReminder] Bat dau quet user can gui nhac nho streak ({}h VN, ngay {})",
+        log.info("[StreakReminder DEMO] Bat dau quet user can gui nhac nho streak ({}h VN, ngay {})",
                 currentHour, today);
 
         // Lay danh sach user thoa man dieu kien: bat thong bao + co streak + chua hoc hom nay + chua duoc gui mail hom nay
