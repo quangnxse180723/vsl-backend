@@ -101,7 +101,7 @@ public class EmailServiceImpl implements EmailService {
                       <div style="color: #9ca3af; font-size: 13px; text-transform: uppercase; letter-spacing: 2px;">Ng\u00e0y li\u00ean ti\u1ebfp</div>
                     </div>
                     <div style="text-align: center; margin-bottom: 28px;">
-                      <a href="https://signmentor.click" 
+                      <a href="https://sighmentor.click" 
                          style="display: inline-block; background: linear-gradient(135deg, #4f46e5 0%%, #7c3aed 100%%); color: #fff; text-decoration: none; font-weight: 700; font-size: 16px; padding: 14px 36px; border-radius: 10px; box-shadow: 0 4px 24px rgba(79,70,229,0.4);">
                         \uD83D\uDCDA Luy\u1ec7n t\u1eadp ngay
                       </a>
