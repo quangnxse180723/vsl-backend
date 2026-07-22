@@ -46,7 +46,7 @@ public class User {
     private LocalDateTime lastLogin;
 
     /** Mac dinh TAT - nguoi dung phai tu BAT de nhan email nhac nho streak. */
-    @Column(name = "email_notifications_enabled", nullable = false)
+    @Column(name = "email_notifications_enabled", nullable = false, columnDefinition = "boolean default false")
     @Builder.Default
     private boolean emailNotificationsEnabled = false;
 
