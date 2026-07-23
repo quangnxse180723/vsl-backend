@@ -4,8 +4,8 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
 @Data
-public class CreateCommentRequest {
-    @NotBlank(message = "Noi dung binh luan khong duoc de trong")
+public class CreateReplyRequest {
+    @NotBlank(message = "Noi dung tra loi khong duoc de trong")
     private String content;
 
     private Long mentionedUserId;

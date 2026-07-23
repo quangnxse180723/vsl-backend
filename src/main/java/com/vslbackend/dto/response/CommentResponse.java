@@ -14,8 +14,12 @@ public class CommentResponse {
     private Long userId;
     private String userName;
     private String userAvatar;
+    private Long mentionedUserId;
+    private String mentionedUserName;
     private String content;
     private LocalDateTime createdAt;
     private List<ReplyResponse> replies;
     private long replyCount;
+    private long likeCount;
+    private boolean likedByMe;
 }

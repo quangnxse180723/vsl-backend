@@ -1,6 +1,7 @@
 package com.vslbackend.controller;
 
 import com.vslbackend.dto.response.BlogResponse;
+import com.vslbackend.dto.response.BlogSearchResponse;
 import com.vslbackend.security.CustomUserDetails;
 import com.vslbackend.service.inter.BlogService;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +27,24 @@ public class BlogController {
             @RequestParam(defaultValue = "10") int size,
             @AuthenticationPrincipal CustomUserDetails principal) {
         return ResponseEntity.ok(blogService.getPublishedBlogs(page, size, uid(principal)));
+    }
+
+    @GetMapping("/search")
+    public ResponseEntity<BlogSearchResponse> searchBlogsAndUsers(
+            @RequestParam(defaultValue = "") String keyword,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @AuthenticationPrincipal CustomUserDetails principal) {
+        return ResponseEntity.ok(blogService.searchPublishedBlogsAndUsers(keyword, page, size, uid(principal)));
+    }
+
+    @GetMapping("/users/{userId}")
+    public ResponseEntity<Page<BlogResponse>> getPublishedBlogsByUser(
+            @PathVariable Long userId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @AuthenticationPrincipal CustomUserDetails principal) {
+        return ResponseEntity.ok(blogService.getPublishedBlogsByUser(userId, page, size, uid(principal)));
     }
 
     @GetMapping("/{id}")

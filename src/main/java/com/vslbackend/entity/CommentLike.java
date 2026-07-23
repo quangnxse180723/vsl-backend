@@ -6,34 +6,32 @@ import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
 
-/** Mot binh luan cua user duoi 1 bai blog. */
 @Entity
-@Table(name = "blog_comments")
+@Table(
+        name = "comment_likes",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_comment_like_comment_user",
+                columnNames = {"comment_id", "user_id"}
+        )
+)
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class BlogComment {
+public class CommentLike {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "blog_id", nullable = false)
-    private Blog blog;
+    @JoinColumn(name = "comment_id", nullable = false)
+    private BlogComment comment;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "mentioned_user_id")
-    private User mentionedUser;
-
-    @Column(nullable = false, columnDefinition = "TEXT")
-    private String content;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

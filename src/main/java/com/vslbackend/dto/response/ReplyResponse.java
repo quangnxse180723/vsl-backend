@@ -17,4 +17,6 @@ public class ReplyResponse {
     private String mentionedUserName;
     private String content;
     private LocalDateTime createdAt;
+    private long likeCount;
+    private boolean likedByMe;
 }

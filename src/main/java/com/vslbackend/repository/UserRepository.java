@@ -2,6 +2,9 @@ package com.vslbackend.repository;
 
 import com.vslbackend.entity.Role;
 import com.vslbackend.entity.User;
+import com.vslbackend.entity.UserStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -19,6 +22,20 @@ public interface UserRepository extends JpaRepository<User, Long> {
     boolean existsByUsername(String username);
 
     long countByRole(Role role);
+
+    @Query("""
+        SELECT u FROM User u
+        WHERE u.status = :status
+          AND (
+            LOWER(COALESCE(u.fullName, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
+            OR LOWER(u.username) LIKE LOWER(CONCAT('%', :keyword, '%'))
+          )
+        ORDER BY u.fullName ASC, u.username ASC
+    """)
+    Page<User> searchByNameOrUsername(
+            @Param("keyword") String keyword,
+            @Param("status") UserStatus status,
+            Pageable pageable);
 
     /**
      * Tim tat ca user du dieu kien can gui email nhac nho streak:
