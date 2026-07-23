@@ -76,13 +76,15 @@ public class SignLanguageController {
     public CompletableFuture<ResponseEntity<ApiResponse<EvaluationResponse>>> evaluate(
             @RequestPart("video") MultipartFile video,
             @RequestParam("expectedId") int expectedId,
+            @RequestParam(value = "startFrac", required = false, defaultValue = "0.0") float startFrac,
+            @RequestParam(value = "endFrac", required = false, defaultValue = "1.0") float endFrac,
             @AuthenticationPrincipal CustomUserDetails principal) {
 
         Long userId = principal.getUser().getUserId();
-        log.info("Evaluate request queued: userId={}, expectedId={}, fileSize={}KB",
-                userId, expectedId, video.getSize() / 1024);
+        log.info("Evaluate request queued: userId={}, expectedId={}, fileSize={}KB, window=[{},{}]",
+                userId, expectedId, video.getSize() / 1024, startFrac, endFrac);
 
-        return evaluationService.evaluate(video, expectedId, userId)
+        return evaluationService.evaluate(video, expectedId, userId, startFrac, endFrac)
                 .thenApply(result -> ResponseEntity.ok(ApiResponse.of("Danh gia hoan tat", result)));
     }
 

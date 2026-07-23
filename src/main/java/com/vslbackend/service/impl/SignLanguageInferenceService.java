@@ -38,8 +38,10 @@ import java.io.File;
 import java.nio.FloatBuffer;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -176,7 +178,8 @@ public class SignLanguageInferenceService implements SignLanguageEvaluationServi
      */
     @Async("aiTaskExecutor")
     @Override
-    public CompletableFuture<EvaluationResponse> evaluate(MultipartFile videoFile, int expectedId, Long userId) {
+    public CompletableFuture<EvaluationResponse> evaluate(MultipartFile videoFile, int expectedId, Long userId,
+                                                          float startFrac, float endFrac) {
         validateVideoFile(videoFile);
 
         if (ortSession == null) {
@@ -190,8 +193,8 @@ public class SignLanguageInferenceService implements SignLanguageEvaluationServi
             videoFile.transferTo(tempFile);
             log.debug("Saved practice video to temp: {} ({} bytes)", tempFile.getName(), tempFile.length());
 
-            // 2. Trich 16 frames cach deu nhau
-            Mat[] frames = extractSampledFrames(tempFile);
+            // 2. Trich 16 frames cach deu nhau TRONG cua so dong tac [startFrac, endFrac]
+            Mat[] frames = extractSampledFrames(tempFile, startFrac, endFrac);
 
             // 3. Tao tensor float[1,3,16,224,224] va flatten
             float[] tensorData = buildTensorData(frames); // frames[i].release() duoc goi ben trong
@@ -199,8 +202,12 @@ public class SignLanguageInferenceService implements SignLanguageEvaluationServi
             // 4. ONNX inference voi try-with-resources (C++ tu don rac)
             float[] logits = runInference(tensorData);
 
-            // 5. Softmax + danh gia ket qua
-            float[] probabilities = softmax(logits);
+            // 5. Softmax CHI TREN cac tu CO VIDEO (bo qua 957 lop app khong dung) + danh gia.
+            //    Khong cham "cam" canh tranh voi 1000 lop -> hang & do tin phan anh dung
+            //    pham vi app (43 tu), khong bi cac lop nhieu keo xuong.
+            Map<Integer, String> vocabClasses = loadVocabClasses();
+            float[] probabilities = softmaxMasked(logits, vocabClasses.keySet());
+            logTopPredictions(probabilities, vocabClasses, 5);
             EvaluationResponse response = buildResponse(probabilities, expectedId);
 
             // 6. Ghi lich su (non-critical - loi khong anh huong response)
@@ -240,7 +247,7 @@ public class SignLanguageInferenceService implements SignLanguageEvaluationServi
      *
      * Neu tong frames < 16: nhan ban frame cuoi den du 16.
      */
-    private Mat[] extractSampledFrames(File videoFile) throws Exception {
+    private Mat[] extractSampledFrames(File videoFile, float startFrac, float endFrac) throws Exception {
         OpenCVFrameConverter.ToMat converter = new OpenCVFrameConverter.ToMat();
 
         // try-with-resources: grabber.close() goi ca stop() va release() trong moi truong hop,
@@ -248,7 +255,7 @@ public class SignLanguageInferenceService implements SignLanguageEvaluationServi
         try (FFmpegFrameGrabber grabber = new FFmpegFrameGrabber(videoFile)) {
             try {
                 grabber.start();
-                return sequentialGrabAndSample(grabber, converter);
+                return sequentialGrabAndSample(grabber, converter, startFrac, endFrac);
             } catch (AppException e) {
                 throw e;
             } catch (Exception e) {
@@ -258,9 +265,15 @@ public class SignLanguageInferenceService implements SignLanguageEvaluationServi
         }
     }
 
-    /** Grab toan bo roi lay mau deu - tat dinh, khop pipeline Python. */
+    /**
+     * Grab toan bo roi lay 16 mau deu TRONG cua so dong tac [startFrac, endFrac].
+     * Cat sat dong tac giup 16 frame khong bi loang boi doan tay dung yen -> MViTv2
+     * nhan dien on dinh & chinh xac hon (khop phan bo luc train). startFrac/endFrac
+     * mac dinh 0..1 (ca video) -> giu nguyen hanh vi cu neu frontend khong gui.
+     */
     private Mat[] sequentialGrabAndSample(FFmpegFrameGrabber grabber,
-                                           OpenCVFrameConverter.ToMat converter) throws Exception {
+                                           OpenCVFrameConverter.ToMat converter,
+                                           float startFrac, float endFrac) throws Exception {
         List<Mat> buffer = new ArrayList<>();
         try {
             Frame f;
@@ -281,20 +294,27 @@ public class SignLanguageInferenceService implements SignLanguageEvaluationServi
         }
 
         int bufSize = buffer.size();
+
+        // Cua so dong tac trong buffer. Cua so qua hep / khong hop le -> dung ca video.
+        float s = Math.max(0f, Math.min(1f, startFrac));
+        float e = Math.max(0f, Math.min(1f, endFrac));
+        if (e - s < 0.05f) { s = 0f; e = 1f; }
+        int lo = Math.max(0, Math.min(bufSize - 1, Math.round(s * bufSize)));
+        int hi = Math.max(lo + 1, Math.min(bufSize, Math.round(e * bufSize)));
+        int win = hi - lo;
+
+        // Lay 16 mau deu TRONG cua so; CLONE (khong tieu thu) roi giai phong toan bo buffer.
+        // Neu cua so < 16 frame: nhan ban frame cuoi cua cua so cho du 16.
         Mat[] frames = new Mat[REQUIRED_FRAMES];
-
         for (int i = 0; i < REQUIRED_FRAMES; i++) {
-            int idx = (bufSize < REQUIRED_FRAMES)
-                    ? Math.min(i, bufSize - 1)
-                    : (int) ((long) i * bufSize / REQUIRED_FRAMES);
-            frames[i] = buffer.get(idx);
-            buffer.set(idx, null); // danh dau da tieu thu
+            int idx = (win < REQUIRED_FRAMES)
+                    ? lo + Math.min(i, win - 1)
+                    : lo + (int) ((long) i * win / REQUIRED_FRAMES);
+            frames[i] = buffer.get(idx).clone();
         }
+        buffer.forEach(Mat::release);
 
-        // Giai phong cac frame khong duoc chon
-        buffer.stream().filter(m -> m != null).forEach(Mat::release);
-
-        fillNullFrames(frames);
+        log.debug("Sampled 16 frames from window [{},{}) of {} decoded frames", lo, hi, bufSize);
         return frames;
     }
 
@@ -423,6 +443,57 @@ public class SignLanguageInferenceService implements SignLanguageEvaluationServi
         }
         for (int i = 0; i < probs.length; i++) probs[i] /= sum;
         return probs;
+    }
+
+    /**
+     * Danh sach lop hop le = expected_id cua cac tu vung CO VIDEO (43 tu).
+     * Chi cham diem trong tap nay -> hang & do tin phan anh dung pham vi app.
+     */
+    private Map<Integer, String> loadVocabClasses() {
+        Map<Integer, String> map = new HashMap<>();
+        vocabularyRepository.findAll().forEach(v -> {
+            if (v.getExpectedId() != null && v.getVideoTutorialUrl() != null) {
+                map.putIfAbsent(v.getExpectedId(), v.getWord());
+            }
+        });
+        return map;
+    }
+
+    /**
+     * Softmax CHI tren cac lop hop le (tu co video); cac lop khac tra ve xac suat 0.
+     * Nho vay rank/confidence tinh trong pham vi 43 tu, khong bi 957 lop nhieu.
+     */
+    private float[] softmaxMasked(float[] logits, Set<Integer> validIds) {
+        if (validIds.isEmpty()) return softmax(logits); // fallback: chua co vocab -> nhu cu
+
+        float max = Float.NEGATIVE_INFINITY;
+        for (int id : validIds) {
+            if (id >= 0 && id < logits.length && logits[id] > max) max = logits[id];
+        }
+        float[] probs = new float[logits.length]; // mac dinh 0 cho lop khong hop le
+        float sum = 0f;
+        for (int id : validIds) {
+            if (id < 0 || id >= logits.length) continue;
+            float e = (float) Math.exp(logits[id] - max);
+            probs[id] = e;
+            sum += e;
+        }
+        if (sum > 0f) {
+            for (int id : validIds) if (id >= 0 && id < logits.length) probs[id] /= sum;
+        }
+        return probs;
+    }
+
+    /** Log top-K du doan (CHI gom cac tu co video) de doi chieu. */
+    private void logTopPredictions(float[] probs, Map<Integer, String> idToWord, int k) {
+        List<Integer> ids = new ArrayList<>(idToWord.keySet());
+        ids.sort((a, b) -> Float.compare(probs[b], probs[a]));
+        StringBuilder sb = new StringBuilder("Top " + k + " (chi trong " + idToWord.size() + " tu co video):");
+        for (int i = 0; i < Math.min(k, ids.size()); i++) {
+            int id = ids.get(i);
+            sb.append(String.format(" #%d[id=%d '%s' %.1f%%]", i + 1, id, idToWord.get(id), probs[id] * 100));
+        }
+        log.info(sb.toString());
     }
 
     /**
