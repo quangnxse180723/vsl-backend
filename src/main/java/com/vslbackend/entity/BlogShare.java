@@ -28,6 +28,10 @@ public class BlogShare {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "recipient_user_id")
+    private User recipientUser;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private ShareType shareType;     // COPY_URL hoặc PROFILE

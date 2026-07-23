@@ -7,6 +7,8 @@ import lombok.Data;
 @Builder
 public class ShareResponse {
     private long shareCount;
-    private String blogUrl;      // FE dùng để copy
-    private String shareType;    // COPY_URL hoặc PROFILE
+    private String blogUrl;
+    private String shareType;
+    private Long recipientUserId;
+    private String recipientName;
 }

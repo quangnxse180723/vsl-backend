@@ -67,7 +67,10 @@ public enum ErrorCode {
     COMMENT_NOT_FOUND("BLOG_6004", "Khong tim thay binh luan", HttpStatus.NOT_FOUND),
     REPORT_NOT_FOUND("BLOG_6005", "Khong tim thay don to cao", HttpStatus.NOT_FOUND),
     ALREADY_REPORTED("BLOG_6006", "Ban da to cao bai viet nay roi", HttpStatus.CONFLICT),
-    CANNOT_REPORT_OWN_BLOG("BLOG_6007", "Ban khong the to cao bai viet cua chinh minh", HttpStatus.BAD_REQUEST);
+    CANNOT_REPORT_OWN_BLOG("BLOG_6007", "Ban khong the to cao bai viet cua chinh minh", HttpStatus.BAD_REQUEST),
+    CANNOT_FOLLOW_SELF("BLOG_6008", "Ban khong the tu theo doi chinh minh", HttpStatus.BAD_REQUEST),
+    NOT_FRIEND("BLOG_6009", "Chi co the chia se qua profile voi ban be", HttpStatus.FORBIDDEN),
+    NOTIFICATION_NOT_FOUND("BLOG_6010", "Khong tim thay thong bao", HttpStatus.NOT_FOUND);
 
     private final String code;
     private final String message;

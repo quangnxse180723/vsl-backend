@@ -51,7 +51,7 @@ public class AdminBlogController {
     /** Danh sach binh luan that cua bai (admin xem chi tiet). */
     @GetMapping("/{id}/comments")
     public ResponseEntity<List<CommentResponse>> getBlogComments(@PathVariable Long id) {
-        return ResponseEntity.ok(engagementService.getComments(id));
+        return ResponseEntity.ok(engagementService.getComments(id, null));
     }
 
     /** Danh sach nguoi da thich bai (admin xem chi tiet). */
