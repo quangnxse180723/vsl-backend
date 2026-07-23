@@ -5,18 +5,10 @@ import com.vslbackend.dto.request.admin.AdminUpdateBlogRequest;
 import com.vslbackend.dto.request.user.UserCreateBlogRequest;
 import com.vslbackend.dto.request.user.UserUpdateBlogRequest;
 import com.vslbackend.dto.response.BlogResponse;
-import com.vslbackend.entity.Blog;
-import com.vslbackend.entity.BlogReport;
-import com.vslbackend.entity.BlogStatus;
-import com.vslbackend.entity.ReportStatus;
-import com.vslbackend.entity.User;
+import com.vslbackend.entity.*;
 import com.vslbackend.exception.AppException;
 import com.vslbackend.exception.ErrorCode;
-import com.vslbackend.repository.BlogCommentRepository;
-import com.vslbackend.repository.BlogLikeRepository;
-import com.vslbackend.repository.BlogReportRepository;
-import com.vslbackend.repository.BlogRepository;
-import com.vslbackend.repository.UserRepository;
+import com.vslbackend.repository.*;
 import com.vslbackend.service.GeminiModerationService;
 import com.vslbackend.service.MinioService;
 import com.vslbackend.service.inter.BlogService;
@@ -44,6 +36,7 @@ public class BlogServiceImpl implements BlogService {
     private final BlogLikeRepository blogLikeRepository;
     private final BlogCommentRepository blogCommentRepository;
     private final BlogReportRepository blogReportRepository;
+    private final BlogShareRepository blogShareRepository;
 
     private BlogResponse toResponse(Blog blog, Long currentUserId) {
         boolean likedByMe = currentUserId != null
@@ -177,6 +170,8 @@ public class BlogServiceImpl implements BlogService {
         return doUploadThumbnail(blog, image);
     }
 
+
+
     // ──────────────────────── USER SPECIFIC METHODS ────────────────────────
 
     @Override
@@ -258,6 +253,14 @@ public class BlogServiceImpl implements BlogService {
         return doUploadThumbnail(blog, image);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public Page<BlogResponse> getSharedBlogsOnProfile(Long userId, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        return blogShareRepository
+                .findByUser_UserIdAndShareType(userId, BlogShare.ShareType.PROFILE, pageable)
+                .map(share -> toResponse(share.getBlog(), userId));
+    }
     // ──────────────────────── HELPERS ────────────────────────
 
     private BlogStatus parseStatus(String raw) {

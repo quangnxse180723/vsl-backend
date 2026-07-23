@@ -1,15 +1,7 @@
 package com.vslbackend.service.impl;
 
-import com.vslbackend.dto.response.CommentResponse;
-import com.vslbackend.dto.response.LikeResponse;
-import com.vslbackend.dto.response.LikeUserResponse;
-import com.vslbackend.dto.response.ReportResponse;
-import com.vslbackend.entity.Blog;
-import com.vslbackend.entity.BlogComment;
-import com.vslbackend.entity.BlogLike;
-import com.vslbackend.entity.BlogReport;
-import com.vslbackend.entity.ReportStatus;
-import com.vslbackend.entity.User;
+import com.vslbackend.dto.response.*;
+import com.vslbackend.entity.*;
 import com.vslbackend.exception.AppException;
 import com.vslbackend.exception.ErrorCode;
 import com.vslbackend.repository.*;
@@ -35,6 +27,8 @@ public class BlogEngagementServiceImpl implements BlogEngagementService {
     private final BlogLikeRepository blogLikeRepository;
     private final BlogCommentRepository blogCommentRepository;
     private final BlogReportRepository blogReportRepository;
+    private final CommentReplyRepository commentReplyRepository;
+    private final BlogShareRepository blogShareRepository;
 
     private Blog getBlogOrThrow(Long blogId) {
         return blogRepository.findById(blogId)
@@ -130,6 +124,75 @@ public class BlogEngagementServiceImpl implements BlogEngagementService {
                 .build());
     }
 
+    @Override
+    public ReplyResponse addReply(Long commentId, Long userId, Long mentionedUserId, String content) {
+        BlogComment comment = blogCommentRepository.findById(commentId)
+                .orElseThrow(() -> new AppException(ErrorCode.COMMENT_NOT_FOUND));
+
+        User user = getUserOrThrow(userId);
+
+        User mentionedUser = null;
+        if (mentionedUserId != null) {
+            mentionedUser = getUserOrThrow(mentionedUserId);
+        }
+
+        CommentReply reply = commentReplyRepository.save(CommentReply.builder()
+                .comment(comment)
+                .user(user)
+                .mentionedUser(mentionedUser)
+                .content(content)
+                .build());
+
+        return toReplyResponse(reply);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<ReplyResponse> getReplies(Long commentId, Pageable pageable) {
+        return commentReplyRepository
+                .findByCommentIdWithUsers(commentId, pageable)
+                .map(this::toReplyResponse);
+    }
+
+    @Override
+    public void deleteReply(Long replyId, Long userId) {
+        CommentReply reply = commentReplyRepository.findById(replyId)
+                .orElseThrow(() -> new AppException(ErrorCode.COMMENT_NOT_FOUND));
+
+        if (!reply.getUser().getUserId().equals(userId)) {
+            throw new AppException(ErrorCode.INVALID_REQUEST, "Ban khong co quyen xoa reply nay");
+        }
+
+        commentReplyRepository.delete(reply);
+    }
+
+    @Override
+    public ShareResponse shareBlog(Long blogId, Long userId, String shareType) {
+        Blog blog = getBlogOrThrow(blogId);
+        User user = getUserOrThrow(userId);
+
+        BlogShare.ShareType type;
+        try {
+            type = BlogShare.ShareType.valueOf(shareType.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new AppException(ErrorCode.INVALID_REQUEST, "shareType phải là COPY_URL hoặc PROFILE");
+        }
+
+        blogShareRepository.save(BlogShare.builder()
+                .blog(blog)
+                .user(user)
+                .shareType(type)
+                .build());
+
+        String blogUrl = "https://www.sighmentor.click/blogs/" + blogId;
+
+        return ShareResponse.builder()
+                .shareCount(blogShareRepository.countByBlog_Id(blogId))
+                .blogUrl(blogUrl)          // trả về để FE copy
+                .shareType(type.name())
+                .build();
+    }
+
     // ──────────────────────── ADMIN ────────────────────────
 
     @Override
@@ -197,6 +260,22 @@ public class BlogEngagementServiceImpl implements BlogEngagementService {
                 .blogStatus(b != null ? b.getStatus() : null)
                 .blogAuthorId(b != null && b.getAuthor() != null ? b.getAuthor().getUserId() : null)
                 .blogAuthorName(b != null && b.getAuthor() != null ? b.getAuthor().getFullName() : null)
+                .build();
+    }
+
+    private ReplyResponse toReplyResponse(CommentReply r) {
+        User u = r.getUser();
+        User mentioned = r.getMentionedUser();
+        return ReplyResponse.builder()
+                .id(r.getId())
+                .commentId(r.getComment() != null ? r.getComment().getId() : null)
+                .userId(u != null ? u.getUserId() : null)
+                .userName(u != null ? u.getFullName() : null)
+                .userAvatar(u != null ? u.getAvatarUrl() : null)
+                .mentionedUserId(mentioned != null ? mentioned.getUserId() : null)
+                .mentionedUserName(mentioned != null ? mentioned.getFullName() : null)
+                .content(r.getContent())
+                .createdAt(r.getCreatedAt())
                 .build();
     }
 }
