@@ -1,9 +1,9 @@
 package com.vslbackend.scheduler;
 
-import com.vslbackend.controller.PracticeStatsController;
 import com.vslbackend.entity.User;
 import com.vslbackend.repository.AttemptHistoryRepository;
 import com.vslbackend.repository.UserRepository;
+import com.vslbackend.service.PracticeStreakCalculator;
 import com.vslbackend.service.inter.EmailService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -68,8 +68,8 @@ public class StreakReminderScheduler {
             try {
                 // Tinh streak hien tai cua user nay
                 List<LocalDate> practiceDates = attemptHistoryRepository.findDistinctPracticeDates(user.getUserId());
-                PracticeStatsController.StreakResult streak =
-                        PracticeStatsController.computeStreak(practiceDates, today);
+                PracticeStreakCalculator.StreakResult streak =
+                        PracticeStreakCalculator.computeStreak(practiceDates, today);
 
                 int currentStreak = streak.current();
 
