@@ -3,6 +3,7 @@ package com.vslbackend.controller;
 import com.vslbackend.dto.request.user.UserCreateBlogRequest;
 import com.vslbackend.dto.request.user.UserUpdateBlogRequest;
 import com.vslbackend.dto.response.BlogResponse;
+import com.vslbackend.security.CustomUserDetails;
 import com.vslbackend.service.inter.BlogService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -11,6 +12,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -78,5 +80,13 @@ public class UserBlogController {
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND))
                 .getUserId();
+    }
+
+    @GetMapping("/shared/me")
+    public ResponseEntity<Page<BlogResponse>> getSharedBlogs(
+            @AuthenticationPrincipal CustomUserDetails principal,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return ResponseEntity.ok(blogService.getSharedBlogsOnProfile(principal.getUser().getUserId(), page, size));
     }
 }
