@@ -261,7 +261,7 @@ public class BlogEngagementServiceImpl implements BlogEngagementService {
             blogNotificationService.notifyShare(user, recipient, blog);
         }
 
-        String blogUrl = "https://www.sighmentor.click/blogs/" + blogId;
+        String blogUrl = "https://www.sighmentor.click";
 
         return ShareResponse.builder()
                 .shareCount(blogShareRepository.countByBlog_Id(blogId))
