@@ -4,7 +4,6 @@ import com.vslbackend.dto.response.VocabularyExistsResponse;
 import com.vslbackend.dto.response.VocabularyResponse;
 import com.vslbackend.dto.response.VocabularySynonymResponse;
 import com.vslbackend.dto.request.CreateVocabularyRequest;
-import com.vslbackend.dto.response.VocabularyResponse;
 import com.vslbackend.entity.Category;
 import com.vslbackend.entity.Vocabulary;
 import com.vslbackend.exception.AppException;
@@ -142,7 +141,7 @@ public class VocabularyServiceImpl implements VocabularyService {
         return word == null ? "" : word.trim().replaceAll("\\s+", " ");
     }
 
-    private VocabularyResponse toResponse(Vocabulary v) {
+    @Override
     public VocabularyResponse create(CreateVocabularyRequest request) {
         Category category = getCategoryOrThrow(request.getCategoryId());
 
