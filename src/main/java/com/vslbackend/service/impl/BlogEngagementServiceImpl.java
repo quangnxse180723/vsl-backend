@@ -8,6 +8,7 @@ import com.vslbackend.repository.*;
 import com.vslbackend.service.inter.BlogEngagementService;
 import com.vslbackend.service.inter.BlogNotificationService;
 import com.vslbackend.service.inter.FollowService;
+import com.vslbackend.service.GeminiModerationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -36,6 +37,7 @@ public class BlogEngagementServiceImpl implements BlogEngagementService {
     private final BlogNotificationRepository blogNotificationRepository;
     private final BlogNotificationService blogNotificationService;
     private final FollowService followService;
+    private final GeminiModerationService geminiModerationService;
 
     private Blog getBlogOrThrow(Long blogId) {
         return blogRepository.findById(blogId)
@@ -141,6 +143,12 @@ public class BlogEngagementServiceImpl implements BlogEngagementService {
 
     @Override
     public CommentResponse addComment(Long blogId, Long userId, Long mentionedUserId, String content) {
+        String safeContent = requireContent(content);
+        GeminiModerationService.ModerationResult modResult = geminiModerationService.moderate("Binh luan", safeContent);
+        if (!modResult.allowed()) {
+            throw new AppException(ErrorCode.INVALID_REQUEST, "Binh luan bi tu choi: " + modResult.reason());
+        }
+
         Blog blog = getBlogOrThrow(blogId);
         User user = getUserOrThrow(userId);
         User mentionedUser = mentionedUserId != null ? getUserOrThrow(mentionedUserId) : null;
@@ -149,7 +157,7 @@ public class BlogEngagementServiceImpl implements BlogEngagementService {
                 .blog(blog)
                 .user(user)
                 .mentionedUser(mentionedUser)
-                .content(requireContent(content))
+                .content(safeContent)
                 .build());
 
         blogNotificationService.notifyMention(user, mentionedUser, blog, comment, null);
@@ -192,6 +200,12 @@ public class BlogEngagementServiceImpl implements BlogEngagementService {
 
     @Override
     public ReplyResponse addReply(Long commentId, Long userId, Long mentionedUserId, String content) {
+        String safeContent = requireContent(content);
+        GeminiModerationService.ModerationResult modResult = geminiModerationService.moderate("Tra loi", safeContent);
+        if (!modResult.allowed()) {
+            throw new AppException(ErrorCode.INVALID_REQUEST, "Tra loi bi tu choi: " + modResult.reason());
+        }
+
         BlogComment comment = blogCommentRepository.findById(commentId)
                 .orElseThrow(() -> new AppException(ErrorCode.COMMENT_NOT_FOUND));
         User user = getUserOrThrow(userId);
@@ -201,7 +215,7 @@ public class BlogEngagementServiceImpl implements BlogEngagementService {
                 .comment(comment)
                 .user(user)
                 .mentionedUser(mentionedUser)
-                .content(requireContent(content))
+                .content(safeContent)
                 .build());
 
         blogNotificationService.notifyMention(user, mentionedUser, comment.getBlog(), comment, reply);
