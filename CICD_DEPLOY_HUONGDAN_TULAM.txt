@@ -1,0 +1,391 @@
+============================================================================
+ HUONG DAN TU LAM: TRIEN KHAI CI/CD VA DEPLOY BACKEND LEN AZURE VM
+ (Viet de tu on lai / giai thich cho giao vien luong thuc thi, khong can
+ dua vao AI ho tro - lam tung buoc thu cong)
+============================================================================
+
+MUC TIEU: Hieu va tu lam duoc toan bo luong sau, KHONG can AI:
+
+  [Sua code] -> [Push len GitHub nhanh main]
+       |
+       v
+  [GitHub Actions tu dong chay]
+       |-- Job 1 "test"          : build + chay unit test (Maven)
+       |-- Job 2 "build-and-push": build Docker image, push len GHCR
+       |-- Job 3 "deploy"        : SSH vao Azure VM, pull image moi,
+       |                           restart container backend
+       v
+  [Server tren Azure VM chay ban moi nhat, khong can lam tay]
+
+Day chinh la y nghia cua "CI/CD": CI (Continuous Integration) = tu dong
+test + build moi lan co code moi; CD (Continuous Deployment) = tu dong
+dua ban build do len server that.
+
+
+===========================================================================
+BUOC 1: HIEU KIEN TRUC UNG DUNG CAN DEPLOY
+===========================================================================
+Truoc khi dong bat cu thu gi, phai biet minh dang deploy CAI GI:
+
+  - Backend Spring Boot (Java 21), dong goi thanh Docker image
+  - Can 3 thanh phan chay cung luc (dinh nghia trong docker-compose.yml):
+      1. PostgreSQL   - luu du lieu quan he (user, blog, tu vung...)
+      2. MinIO        - luu file (video, anh) theo chuan S3
+      3. App (backend)- goi API, can 1 file model AI (.onnx, ~136MB)
+         de nhan dien ngon ngu ky hieu
+  - Backend can cac bien moi truong: DB_URL, JWT_SECRET, MINIO_*,
+    GEMINI_API_KEY (kiem duyet blog bang AI)...
+
+Doc file docker-compose.yml va Dockerfile trong repo la buoc dau tien -
+chung mo ta chinh xac he thong can chay o dau, port nao, phu thuoc gi.
+
+
+===========================================================================
+BUOC 2: CHON NOI CHAY (TAI SAO LA VM, KHONG PHAI APP SERVICE)
+===========================================================================
+Co nhieu cach chay Docker tren Azure (VM, Container Apps, App Service).
+Chon Azure VM vi:
+  - Chay duoc NGUYEN docker-compose.yml co san, khong phai sua code de
+    doi MinIO -> Azure Blob Storage hay tach Postgres ra managed DB
+    rieng (nhung dich vu do deu ton phi rieng VA can sua code Java).
+  - VM co the TAT (deallocate) khi khong dung -> gan nhu khong ton phi
+    luc khong demo, hop voi $100 credit sinh vien dung trong nhieu
+    thang.
+  - App Service ban re nhat co ho tro Docker container da mat phi co
+    dinh hang thang du dung hay khong.
+
+
+===========================================================================
+BUOC 3: TAO MAY AO (VM) TREN AZURE PORTAL
+===========================================================================
+Vao portal.azure.com -> Create a resource -> Virtual Machine, dien:
+
+  3.1. Tab Basics:
+       - Subscription      : Azure for Students
+       - Resource group    : tao moi (vi du "vsl-rg")
+       - Virtual machine name: dat ten de nho
+       - Region            : chon region GAN nguoi dung nhat CO SAN
+         cho subscription cua minh. LUU Y: subscription sinh vien
+         thuong bi GIOI HAN quota theo tung dong may (vi du B-series)
+         o mot so region - neu bao loi
+         "NotAvailableForSubscription" khi chon size, phai DOI REGION
+         khac roi thu lai (khong phai loi thao tac).
+       - Image             : Ubuntu Server (ban LTS moi nhat)
+       - Security type     : "Standard" (KHONG chon "Confidential
+         virtual machines" - loai nay chi cho phep chon cac dong may
+         dat tien danh cho tinh toan bao mat cao, khong can cho du an
+         thuong)
+       - Size               : tim dong may re (B-series hoac D-series
+         tuy region cho phep), toi thieu 2 vCPU / 4-8GB RAM de du chay
+         Postgres + MinIO + JVM + model AI cung luc
+       - Authentication    : SSH public key, key type RSA, dat ten
+         key pair -> TAI VE VA LUU FILE .pem CAN THAN (chi tai duoc
+         1 lan, mat la khong con cach nao lay lai, phai tao VM khac)
+       - Public inbound ports: chon "Allow selected ports" -> tick
+         SSH (22) (CAC PORT KHAC se mo sau, khong co o nhap port tuy y
+         luc nay)
+
+  3.2. Tab Disks: de mac dinh (Standard SSD la du dung)
+
+  3.3. Tab Networking:
+       - Public IP: bam vao ten IP -> doi SKU = Standard, Assignment =
+         Static (QUAN TRONG: Static giu nguyen IP moi lan Stop/Start
+         VM, Dynamic se doi IP lam hong moi cau hinh da tro toi no)
+       - Tim checkbox "Delete public IP and NIC when VM is deleted" ->
+         BAT len (tranh Public IP con "mo coi" bi tinh phi sau khi xoa
+         VM sau nay)
+
+  3.4. Tab Management:
+       - BAT "Enable auto-shutdown", dat gio phu hop (vi du 00:00 gio
+         VN), bat Notification neu muon nhan email nhac truoc khi tat
+         -> day la luoi an toan tranh quen tat VM lam chay het credit.
+         (Luu y: khi VM tu tat theo lich, moi SSH session dang mo se
+         bi ngat dot ngot - neu dang deploy do dang gio do thi phai
+         Start lai VM va chay lai lenh deploy)
+       - Cac muc Defender/Backup/Site Recovery: de Off (khong can,
+         tranh phat sinh phi)
+
+  3.5. Tab Monitoring: de mac dinh Boot diagnostics = On
+
+  3.6. Review + Create -> kiem tra khong co canh bao do -> Create
+
+  Sau khi tao xong, ghi lai: Public IP cua VM, username (thuong la
+  "azureuser" hoac ten tu dat), duong dan file .pem.
+
+
+===========================================================================
+BUOC 4: MO PORT CAN THIET (NETWORK SECURITY GROUP)
+===========================================================================
+VM moi tao chi mo port 22 (SSH). Backend can them:
+
+  Vao VM -> Networking -> Inbound port rules -> Add inbound port rule
+
+  Rule 1: port 8080 (TCP, source Any) - cho API backend
+  Rule 2: port 9000 (TCP, source Any) - cho MinIO S3 API (BAT BUOC mo
+          cong khai vi trinh duyet tai video/anh TRUC TIEP tu MinIO,
+          khong qua trung gian backend)
+
+  KHONG mo port quan tri (MinIO console 9001, pgAdmin 5555...) ra
+  internet - de rieng, chi dung qua SSH tunnel khi can quan tri.
+
+
+===========================================================================
+BUOC 5: SSH VAO VM VA CAI DOCKER
+===========================================================================
+Tu terminal (may co OpenSSH, hoac Git Bash tren Windows):
+
+    ssh -i duong/dan/toi/file.pem azureuser@<PUBLIC_IP>
+
+Lan dau se hoi xac nhan fingerprint, go "yes".
+
+Cai Docker Engine bang script chinh thuc cua Docker:
+
+    curl -fsSL https://get.docker.com | sudo sh
+
+Cho phep user hien tai dung docker khong can go sudo moi lenh, va cho
+Docker tu khoi dong cung VM (quan trong vi VM se bi Stop/Start nhieu
+lan):
+
+    sudo usermod -aG docker $USER
+    sudo systemctl enable docker
+
+Kiem tra: docker --version va docker compose version (ban Docker moi
+da tich hop san Compose plugin, khong can cai them).
+
+
+===========================================================================
+BUOC 6: XU LY QUYEN PULL DOCKER IMAGE TU GHCR (NEU IMAGE LA PRIVATE)
+===========================================================================
+GitHub Actions push image len GitHub Container Registry (ghcr.io) mac
+dinh la PRIVATE, gan voi repo. VM can quyen doc de "docker pull".
+
+Kiem tra nhanh package co public khong:
+    curl -o /dev/null -w "%{http_code}" \
+      https://ghcr.io/v2/<owner>/<repo>/tags/list
+(200 = public, 401 = private, can dang nhap)
+
+Neu la CHU repo (co quyen admin): vao repo -> tab Packages -> chon
+package -> Package settings -> Change visibility -> Public. Don gian
+nhat, khong can quan ly them secret nao.
+
+Neu KHONG co quyen admin repo (chi la collaborator): dung Personal
+Access Token (PAT):
+  1. github.com/settings/tokens/new -> Generate new token (classic)
+  2. Chi tick scope "read:packages" (khong tick gi them - nguyen tac
+     it quyen nhat can thiet)
+  3. Generate -> copy token (chi hien 1 lan)
+  4. Tren VM: dang nhap Docker bang token do, TRUYEN QUA STDIN de
+     khong lo trong lich su lenh/process list:
+       printf "%s" "<TOKEN>" | docker login ghcr.io -u <username> \
+         --password-stdin
+  5. Test: docker pull ghcr.io/<owner>/<repo>:latest
+
+
+===========================================================================
+BUOC 7: VIET FILE DOCKER COMPOSE RIENG CHO PRODUCTION
+===========================================================================
+KHONG dung chung file docker-compose.yml voi may dev - tao ban rieng
+(vi du docker-compose.prod.yml) vi 2 moi truong khac nhau ve ban chat:
+
+  - Dev: build image tu source code local ("build: .") - moi lan chay
+    se tu compile lai.
+  - Production: dung image DA BUILD SAN tu GHCR ("image: ghcr.io/...
+    /ten-app:latest") - VM khong can cai Maven/JDK, chi can Docker,
+    khoi dong nhanh hon nhieu.
+
+Cac diem can chinh cho production:
+  - Bo cac cong cu quan tri khong can thiet (vi du pgAdmin) de giam
+    be mat tan cong.
+  - Database (Postgres): KHONG publish port ra ngoai host - cac
+    service trong cung 1 Docker network van goi duoc nhau qua TEN
+    SERVICE (vi du "postgres:5432") ma khong can mo port ra internet.
+  - Chi publish ra internet nhung port THUC SU can duoc truy cap tu
+    ben ngoai (backend API, va MinIO S3 API neu frontend load file
+    truc tiep tu do).
+
+
+===========================================================================
+BUOC 8: SINH SECRET RIENG CHO PRODUCTION (KHONG DUNG LAI SECRET DEV)
+===========================================================================
+Nguyen tac: moi truong production phai co secret KHAC voi dev/local,
+tranh truong hop lo secret dev (vi du da tung day len GitHub nham) keo
+theo lo ca production.
+
+Sinh secret ngau nhien manh bang openssl (co san tren Linux/Git Bash):
+
+    openssl rand -base64 64     # dung cho JWT_SECRET
+    openssl rand -base64 24     # dung cho mat khau DB, MinIO secret key
+    openssl rand -hex 8         # dung cho MinIO access key
+
+Voi cac API key cua ben thu 3 (vi du Gemini API key): PHAI TU TAO tren
+trang chinh chu (vi du aistudio.google.com/apikey), khong tu bia hay
+doan. Nen TEST key truoc khi dung that bang 1 request don gian goi
+thang API do, tranh phat hien loi luc app da chay production:
+
+    curl "https://generativelanguage.googleapis.com/v1beta/models?key=<KEY>"
+
+Tao file .env rieng cho production, dien day du cac bien can (xem
+.env.example trong repo de biet danh sach bien). QUAN TRONG: kiem tra
+file .gitignore da chan file .env production nay chua bi commit nham
+(vi du ".env.*" thay vi chi chan dung ".env").
+
+
+===========================================================================
+BUOC 9: DEPLOY LAN DAU (THU CONG)
+===========================================================================
+1. Tao thu muc chua stack tren VM:
+     ssh -i key.pem azureuser@<IP> "mkdir -p ~/app/models"
+
+2. Copy file cau hinh va model AI len VM bang scp:
+     scp -i key.pem docker-compose.prod.yml azureuser@<IP>:~/app/docker-compose.yml
+     scp -i key.pem .env.prod azureuser@<IP>:~/app/.env
+     scp -i key.pem models/model.onnx azureuser@<IP>:~/app/models/
+
+3. SSH vao VM, chay:
+     cd ~/app
+     docker compose pull
+     docker compose up -d
+
+4. Kiem tra trang thai: docker compose ps (cot STATUS phai la
+   "healthy" hoac "Up", khong phai "Restarting" hay "Exited")
+
+5. Test tu ben trong VM: curl http://localhost:8080/api/health
+
+6. Test tu MAY CA NHAN (ben ngoai) qua Public IP de xac nhan NSG that
+   su cho phep ket noi:
+     curl http://<PUBLIC_IP>:8080/api/health
+
+
+===========================================================================
+BUOC 10: THIET LAP TU DONG DEPLOY (CD) TRONG GITHUB ACTIONS
+===========================================================================
+Muc tieu: moi lan push code len nhanh main, GitHub tu dong SSH vao VM
+va cap nhat container moi nhat - khong con phai lam Buoc 9 bang tay
+moi lan sua code.
+
+10.1. Tao 1 CAP SSH KEY RIENG chi danh cho CI (khac voi key admin ca
+      nhan dung o Buoc 3), de neu secret nay lo ra thi chi can thu hoi
+      rieng key nay ma khong anh huong quyen truy cap admin chinh:
+
+        ssh-keygen -t ed25519 -f deploy_key -N ""
+
+      Lenh nay tao 2 file: deploy_key (private - GIU BI MAT) va
+      deploy_key.pub (public - dem them vao VM).
+
+10.2. Them public key vao VM (noi vao cuoi file, KHONG ghi de):
+
+        cat deploy_key.pub | ssh -i key.pem azureuser@<IP> \
+          "cat >> ~/.ssh/authorized_keys"
+
+      Test lai: ssh -i deploy_key azureuser@<IP> "echo OK" phai chay
+      duoc truoc khi dung trong CI.
+
+10.3. Sua file workflow (.github/workflows/*.yml), them 1 job MOI sau
+      job build-and-push, vi du dung action "appleboy/ssh-action":
+
+        deploy:
+          needs: build-and-push
+          runs-on: ubuntu-latest
+          steps:
+            - uses: appleboy/ssh-action@v1.2.0
+              with:
+                host: ${{ secrets.VM_HOST }}
+                username: ${{ secrets.VM_USER }}
+                key: ${{ secrets.VM_SSH_KEY }}
+                script: |
+                  cd ~/app
+                  docker compose pull app
+                  docker compose up -d app
+                  docker image prune -f
+
+      Giai thich "needs: build-and-push": job nay CHI chay SAU KHI job
+      build-and-push (build + push image len GHCR) chay xong thanh
+      cong - dam bao image moi da san sang truoc khi VM di pull.
+
+10.4. Vao GitHub repo -> Settings -> Secrets and variables -> Actions
+      -> New repository secret, them 3 secret:
+        VM_HOST    = Public IP cua VM
+        VM_USER    = username SSH (vi du azureuser)
+        VM_SSH_KEY = TOAN BO noi dung file deploy_key (private key),
+                     dan ca 2 dong "-----BEGIN...-----" va
+                     "-----END...-----"
+
+      (Neu khong co quyen Settings cua repo, phai nho chu repo them
+      giup hoac xin cap quyen Admin/Maintain.)
+
+10.5. Commit file workflow da sua, push len nhanh dev (hoac nhanh dang
+      lam viec), sau do dua len nhanh "main" (vi thuong workflow chi
+      kich hoat build+push+deploy khi push vao main, con push vao cac
+      nhanh khac chi chay test):
+
+        git add .github/workflows/<ten-file>.yml
+        git commit -m "ci: add auto-deploy job"
+        git checkout main
+        git merge dev            # hoac tao Pull Request roi merge
+        git push origin main
+
+10.6. Vao tab "Actions" tren GitHub de xem workflow chay real-time,
+      theo doi tung job (test -> build-and-push -> deploy) co mau
+      xanh (thanh cong) khong. Neu do (that bai), bam vao job do de
+      xem log loi chi tiet.
+
+10.7. Xac nhan lai lan cuoi: SSH vao VM, chay "docker compose ps",
+      kiem tra container backend co thoi gian "Created"/"Up" MOI (gan
+      voi thoi diem vua chay workflow), va test lai health endpoint
+      tu ben ngoai.
+
+
+===========================================================================
+BUOC 11: VAN HANH SAU KHI DEPLOY (CAN BIET DE TRA LOI KHI DUOC HOI)
+===========================================================================
+- Xem log container   : docker logs <ten_container> --tail 50 -f
+- Restart 1 service    : docker compose restart <ten_service>
+- Cap nhat thu cong    : docker compose pull && docker compose up -d
+- Dung tam VM de tiet
+  kiem chi phi         : Azure Portal -> VM -> Stop (khong phai chi
+                          dong terminal - phai bam Stop that su moi
+                          ngung tinh phi compute)
+- IP khong doi sau khi
+  Stop/Start            : nho Public IP loai Static da cau hinh o
+                          Buoc 3
+- Neu quen tat, co
+  Auto-shutdown lam
+  luoi an toan          : VM tu tat theo gio da dat, tranh chay het
+                          credit
+
+
+===========================================================================
+TOM TAT LUONG TU DAU DEN CUOI (DE TRA LOI NHANH KHI GIAO VIEN HOI)
+===========================================================================
+1. Sua code -> push len GitHub (nhanh main)
+2. GitHub Actions tu dong kich hoat workflow:
+   a. Job "test": checkout code, cai JDK, chay "mvn test"
+   b. Job "build-and-push" (chi chay neu test qua VA la push vao
+      main): dung Docker Buildx build image tu Dockerfile, push image
+      len GitHub Container Registry (GHCR) voi 2 tag (latest + commit
+      SHA)
+   c. Job "deploy" (chi chay sau khi build-and-push xong): dung SSH
+      action, ket noi vao Azure VM bang private key luu trong GitHub
+      Secrets, chay lenh "docker compose pull" + "docker compose up
+      -d" de VM tai ve image moi nhat va khoi dong lai container
+3. Tren Azure VM: Docker Compose duy tri 3 container (Postgres, MinIO,
+   backend app) chay lien tuc, ket noi voi nhau qua 1 Docker network
+   noi bo; chi backend va MinIO S3 API duoc mo port ra internet qua
+   Network Security Group cua Azure.
+4. Nguoi dung/frontend goi API qua Public IP cua VM tren port 8080.
+
+
+
+
+Dockerfile: Đúng, copy y nguyên, không sửa gì cả. File này chỉ định nghĩa "cách build ra image", nên dùng ở đâu cũng giống nhau (dev hay prod đều build ra cùng 1 loại image).
+
+docker-compose.yml: Không copy y nguyên — dùng làm bản tham khảo rồi chỉnh lại cho phù hợp môi trường production, cụ thể đã đổi 3 chỗ:
+1. build: . → image: ghcr.io/...:latest (production dùng image đã build sẵn từ CI, không tự build lại trên VM)
+2. Bỏ service pgadmin (công cụ quản trị, không cần trên server production)
+3. Bỏ publish port của Postgres và MinIO console ra ngoài (chỉ giữ port 8080 và 9000 cần thiết) — vì lý do bảo mật, không liên quan gì tới code
+
+Ngoài 2 file Docker đó, còn một loạt việc KHÔNG nằm trong Docker mà bắt buộc phải làm thêm ở tầng hạ tầng:
+- Tạo .env mới với secret khác (JWT, mật khẩu DB, MinIO key...) — không dùng lại secret của máy dev
+- Đăng nhập GHCR trên VM để pull được image (vì repo private)
+- Mở port trên Azure Network Security Group (nằm ở tầng Azure, không phải trong file Docker nào)
+- Viết thêm job deploy trong GitHub Actions workflow để tự SSH + docker compose pull/up
