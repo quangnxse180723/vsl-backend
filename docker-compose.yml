@@ -63,6 +63,7 @@ services:
       - vsl-net
 
   app:
+    image: ghcr.io/quangnxse180723/vsl-backend:latest
     build: .
     container_name: vsl-backend
     restart: unless-stopped

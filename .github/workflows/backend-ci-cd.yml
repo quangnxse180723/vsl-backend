@@ -83,6 +83,7 @@ jobs:
           key: ${{ secrets.VM_SSH_KEY }}
           script: |
             cd ~/vsl-backend
+            git pull origin main
             docker compose pull app
             docker compose up -d app
             docker image prune -f

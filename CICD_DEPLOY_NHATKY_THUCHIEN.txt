@@ -1,0 +1,334 @@
+============================================================================
+ NHAT KY THUC HIEN: CI/CD -> DEPLOY BACKEND VSL LEN AZURE VM
+ Ghi lai chi tiet tung buoc da lam trong phien lam viec voi Claude Code
+============================================================================
+
+TONG QUAN KET QUA CUOI CUNG
+----------------------------
+- Backend chay tren 1 Azure VM (Ubuntu 24.04), IP: 20.48.61.15
+- Stack: PostgreSQL + MinIO + Spring Boot app, chay bang Docker Compose
+- CI/CD: push code len nhanh "main" tren GitHub -> tu dong test, build
+  Docker image, push len GitHub Container Registry (GHCR), roi tu dong
+  SSH vao VM de pull image moi va restart container backend.
+- Khong can lam thu cong sau moi lan sua code, chi can push len main.
+
+
+PHAN 1: KHAO SAT DU AN TRUOC KHI DEPLOY
+----------------------------------------
+1.1. Doc cac file co san de hieu stack can chay:
+     - vsl-backend/Dockerfile: build multi-stage (Maven build -> JRE runtime)
+     - vsl-backend/docker-compose.yml: stack dev (Postgres + MinIO + pgAdmin
+       + app), dung "build: ." de tu build image tu source
+     - vsl-backend/.github/workflows/backend-ci-cd.yml: workflow co san,
+       chi co 2 job "test" va "build-and-push" (build & push image len GHCR
+       khi push vao main), CHUA CO buoc deploy thuc te len server nao.
+     - application.properties: xem cac bien moi truong can thiet (DB_URL,
+       JWT_SECRET, MINIO_*, GEMINI_API_KEY, AI_MODEL_PATH...)
+     - SecurityConfig.java: CORS dang de allowedOrigins = "*" (mo cho moi
+       nguon, co TODO "gioi han origin khi len production")
+
+1.2. Ket luan: can (a) noi de chay container (VM/App Service/Container
+     Apps) va (b) them buoc "deploy" vao CI/CD de tu dong dua image moi
+     len noi chay do.
+
+
+PHAN 2: CHON HUONG DEPLOY - TAI SAO LA AZURE VM
+------------------------------------------------
+So sanh 3 huong: Azure VM+Docker Compose / Azure Container Apps /
+Azure App Service (Web App for Containers).
+
+Chon Azure VM + Docker Compose vi:
+- Toan bo docker-compose.yml hien co (Postgres + MinIO + app) chay
+  nguyen xi tren VM, KHONG PHAI SUA CODE (App Service/Container Apps
+  can tach Postgres ra Azure Database rieng, tach MinIO sang Azure Blob
+  Storage -> phai sua code Java o phan upload/doc file).
+- App Service ban Free (F1) khong ho tro chay Docker container tuy y;
+  phai len ban Basic B1 tra phi (~13-15$/thang) CHI cho 1 container,
+  chua tinh DB + storage rieng -> ton credit hon nhieu.
+- VM co the STOP/DEALLOCATE khi khong dung (chi con phi disk ~1-2$/
+  thang), phu hop du an sinh vien dung ngat quang (lam/demo/nop bai),
+  trong khi App Service Plan cu ton tai la bi tinh phi lien tuc.
+
+
+PHAN 3: TAO VM TREN AZURE PORTAL (nguoi dung tu thao tac tren web UI)
+-----------------------------------------------------------------------
+Cac lua chon da chon (sau vai lan phai doi vi gioi han quota cua
+subscription Azure for Students):
+
+  Subscription          : Azure for Students
+  Resource group         : vsl-rg (tao moi)
+  Ten VM                 : vsl-project
+  Region                 : Japan East (Tokyo)
+                            -> ly do: thu Southeast Asia truoc, bi loi
+                            "NotAvailableForSubscription" voi ca dong
+                            B-series (B2s/B2ms) lan D-series (D2s_v3);
+                            East Asia (Hong Kong) co san nhung gia cao
+                            nhat (~96$/thang); Japan East co san va
+                            latency chap nhan duoc tu Viet Nam.
+  Image                  : Ubuntu Server 24.04 LTS - x64
+  Size                   : Standard_D2s_v3 (2 vCPU / 8 GiB RAM)
+                            -> B2s/B2ms bi chan boi quota subscription
+                            (Limit = 0 cho family do o cac region da thu)
+  Security type           : Standard
+                            -> QUAN TRONG: neu de "Confidential virtual
+                            machines" thi Azure chi cho chon cac SKU dat
+                            tien (DCasv5/DCesv5...), day la ly do ban dau
+                            gia hien ra toan >90$/thang.
+  VM architecture         : x64 (khop voi image Docker do GitHub Actions
+                            build, tranh loi kien truc khi Arm64)
+  Availability options    : No infrastructure redundancy required
+  Authentication type     : SSH public key
+  Username                : azureuser
+  SSH key type            : RSA
+  Key pair name           : vsl-project_key (tai ve file .pem, LUU GIU
+                            can than vi Azure chi cho tai 1 lan)
+  Public inbound ports    : chi chon SSH (22) luc tao
+                            (Azure Portal luc tao VM chi cho chon nhanh
+                            trong 4 port co san: 22/80/443/3389, khong co
+                            o nhap port tuy y o buoc nay)
+  Encryption at host      : KHONG tick (khong can cho du an nay, va co
+                            the bao loi neu subscription chua dang ky
+                            tinh nang nay)
+  OS disk type            : Standard SSD (StandardSSD_LRS), mac dinh
+  Delete OS disk with VM  : Yes
+  Public IP               : SKU Standard, Assignment Static
+                            -> QUAN TRONG: Static de IP KHONG doi moi
+                            lan Stop/Start VM
+  Delete public IP va NIC
+  khi xoa VM              : Enabled (ban dau Portal de mac dinh la
+                            Disabled, phai bat len de tranh con Public
+                            IP "mo coi" van bi tinh phi sau khi xoa VM)
+  Key management          : Platform-managed key (mac dinh)
+  Auto-shutdown           : BAT, gio 00:00, timezone SE Asia Standard
+                            Time, co Notification
+                            -> Day la luoi an toan chong chay credit
+                            neu quen tat VM, NHUNG cung chinh la nguyen
+                            nhan VM bi rot ket noi dot ngot 1 lan giua
+                            luc dang deploy (VM tu tat dung 00:00 dem
+                            do). Sau khi phat hien, nguoi dung tu vao
+                            Portal bam Start lai.
+  Defender/Backup/
+  Site Recovery           : Off (khong can, tranh phat sinh phi)
+  Boot diagnostics         : On (mac dinh, de debug neu VM khong boot)
+
+Ket qua: VM tao thanh cong, Public IP = 20.48.61.15
+
+
+PHAN 4: MO PORT MANG (NETWORK SECURITY GROUP)
+------------------------------------------------
+Luc tao VM chi mo port 22. Sau khi tao xong, nguoi dung tu vao:
+  VM "vsl-project" -> Networking -> Inbound port rules -> Add inbound
+  port rule, them 2 rule:
+
+  Rule 1: Destination port 8080, Protocol TCP, Source Any,
+          Priority 310, Name "Allow-Backend-8080"
+          -> cho phep truy cap Spring Boot API tu internet
+
+  Rule 2: Destination port 9000, Protocol TCP, Source Any,
+          Priority 320, Name "Allow-MinIO-9000"
+          -> BAT BUOC phai mo cong khai vi trinh duyet load video/anh
+          TRUC TIEP tu MinIO (khong qua backend proxy), thong qua bien
+          MINIO_PUBLIC_ENDPOINT
+
+  KHONG mo port 9001 (MinIO console quan tri) va 5555 (pgAdmin) ra
+  internet - day la trang quan tri, de lo ra ngoai rat rui ro.
+
+
+PHAN 5: CAI DOCKER TREN VM
+------------------------------
+SSH vao VM bang key admin (.pem):
+    ssh -i vsl-project_key.pem azureuser@20.48.61.15
+
+Cai Docker Engine bang script chinh thuc:
+    curl -fsSL https://get.docker.com | sudo sh
+
+Them user vao group docker (khoi phai go sudo moi lan) va bat Docker
+tu khoi dong cung he thong:
+    sudo usermod -aG docker azureuser
+    sudo systemctl enable docker
+
+Kiem tra: docker --version && docker compose version
+(Docker Compose Plugin da co san trong script cai dat, khong can cai
+rieng)
+
+
+PHAN 6: XU LY QUYEN TRUY CAP GHCR (GITHUB CONTAINER REGISTRY)
+------------------------------------------------------------------
+Repo: quangnxse180723/vsl-backend
+Image: ghcr.io/quangnxse180723/vsl-backend:latest
+
+Kiem tra: curl -o /dev/null -w "%{http_code}" https://ghcr.io/v2/.../
+tags/list -> tra ve 401 -> package dang PRIVATE, VM chua pull duoc.
+
+Thu doi visibility sang Public qua GitHub Settings nhung nguoi dung
+KHONG CO QUYEN admin repo do (bao loi "You don't have access to
+repository options") -> chuyen sang cach 2:
+
+Tao GitHub Personal Access Token (PAT) - classic:
+  - github.com/settings/tokens/new
+  - Scope: CHI tick "read:packages" (quyen thap nhat can thiet)
+  - Expiration: 90 days
+
+Dung PAT de dang nhap Docker tren VM (qua stdin de khong lo token
+trong process list):
+    printf "%s" "<PAT>" | docker login ghcr.io -u quangnxse180723 \
+      --password-stdin
+
+Sau do "docker pull ghcr.io/quangnxse180723/vsl-backend:latest" chay
+thanh cong.
+
+
+PHAN 7: FILE CAU HINH PRODUCTION (docker-compose.prod.yml)
+----------------------------------------------------------------
+Tao file MOI, TACH RIENG khoi docker-compose.yml (file dev), de khong
+anh huong workflow lam viec local. Khac biet chinh so voi ban dev:
+
+  - Service "app": dung "image: ghcr.io/quangnxse180723/vsl-backend:
+    latest" THAY VI "build: ." (khong build lai tren VM, chi pull ban
+    da build san boi CI - VM khong can cai Maven/JDK)
+  - Bo han service "pgadmin" (khong can trong production, giam be mat
+    tan cong)
+  - Postgres: KHONG publish port ra host (chi noi bo trong Docker
+    network "vsl-net", app van ket noi duoc qua ten service "postgres")
+  - MinIO: chi publish port 9000 (S3 API - can public), KHONG publish
+    port 9001 (console quan tri)
+  - App: publish port 8080
+  - Giu nguyen healthcheck, volumes, network tuong tu ban dev
+
+File nay AN TOAN de commit len git (khong chua secret that, chi tham
+chieu ${BIEN_MOI_TRUONG}).
+
+
+PHAN 8: SINH SECRET MOI CHO PRODUCTION (.env.prod)
+--------------------------------------------------------
+KHONG dung lai secret cua .env dev (moi truong local). Sinh moi bang
+openssl:
+    openssl rand -base64 64   -> JWT_SECRET
+    openssl rand -base64 24   -> POSTGRES_PASSWORD, MINIO_SECRET_KEY
+    openssl rand -hex 8       -> MINIO_ACCESS_KEY
+
+Rieng GEMINI_API_KEY: lay lai tu file .env dev CU (da co san tu luc
+lam tinh nang kiem duyet blog truoc do), KHONG tu bia. Truoc khi dung,
+kiem tra key con hop le bang cach goi thu API:
+    curl "https://generativelanguage.googleapis.com/v1beta/models?
+    key=<KEY>"
+-> tra ve danh sach model (200 OK) nghia la key dung.
+
+Luu y: nguoi dung co dua nham 1 chuoi key khac (go nham I/l va thieu 1
+dau gach duoi so voi key that trong .env) - da phat hien nho buoc test
+key bang curl truoc khi dung, tranh loi ngam den khi chay production.
+
+MINIO_PUBLIC_ENDPOINT = http://20.48.61.15:9000 (dung Public IP cua VM,
+vi day la URL trinh duyet se goi truc tiep de tai video/anh)
+
+Cap nhat .gitignore: doi tu chi ignore ".env" thanh ignore ca ".env.*"
+de dam bao file .env.prod (chua secret that) khong bao gio bi commit
+nham len git.
+
+
+PHAN 9: DEPLOY LAN DAU (THU CONG QUA SCP + SSH)
+------------------------------------------------------
+1. Tao thu muc tren VM: mkdir -p ~/vsl-backend/models
+
+2. Upload file cau hinh:
+   scp docker-compose.prod.yml azureuser@VM:~/vsl-backend/docker-compose.yml
+   scp .env.prod azureuser@VM:~/vsl-backend/.env
+
+3. Upload model AI (136MB, chay nen vi file lon):
+   scp models/mvitv2_small.onnx azureuser@VM:~/vsl-backend/models/
+
+4. Tren VM: docker compose pull && docker compose up -d
+   -> Lan dau bi ngat giua chung do VM tu Auto-shutdown luc 00:00 (dung
+   luc dang chay). Sau khi nguoi dung Start lai VM, chay lai lenh tren,
+   ca 3 container (postgres, minio, app) len "healthy" thanh cong.
+
+5. Kiem tra tu ben trong VM: curl http://localhost:8080/api/health
+   -> {"status":"UP"}
+
+6. Kiem tra tu BEN NGOAI (qua Public IP, xac nhan NSG rule dung):
+   curl http://20.48.61.15:8080/api/health -> UP
+   curl http://20.48.61.15:9000/minio/health/live -> 200
+
+
+PHAN 10: THIET LAP AUTO-DEPLOY TU GITHUB ACTIONS (CD)
+------------------------------------------------------------
+10.1. Tao 1 CAP SSH KEY MOI RIENG cho CI (KHONG dung lai key admin
+      .pem ca nhan), de neu secret nay lo thi chi can xoa 1 dong trong
+      authorized_keys tren VM ma khong anh huong key admin chinh:
+        ssh-keygen -t ed25519 -f vsl-ci-deploy-key -N ""
+        -> tao ra vsl-ci-deploy-key (private) va .pub (public)
+
+10.2. Them public key vao VM:
+        cat vsl-ci-deploy-key.pub >> VM:~/.ssh/authorized_keys
+      Test lai bang key moi de chac chan hoat dong truoc khi dung
+      trong CI.
+
+10.3. Sua file .github/workflows/backend-ci-cd.yml: them job "deploy"
+      moi, chay SAU job "build-and-push" (needs: build-and-push), dung
+      action "appleboy/ssh-action@v1.2.0":
+
+        deploy:
+          name: Deploy to Azure VM
+          needs: build-and-push
+          runs-on: ubuntu-latest
+          steps:
+            - name: Deploy via SSH
+              uses: appleboy/ssh-action@v1.2.0
+              with:
+                host: ${{ secrets.VM_HOST }}
+                username: ${{ secrets.VM_USER }}
+                key: ${{ secrets.VM_SSH_KEY }}
+                script: |
+                  cd ~/vsl-backend
+                  docker compose pull app
+                  docker compose up -d app
+                  docker image prune -f
+
+      Chi pull/restart service "app" (--/khong dung "--no-deps" nhung
+      vi cau hinh postgres/minio khong doi nen compose khong dong lai
+      2 container do), tranh downtime khong can thiet cho DB/MinIO.
+
+10.4. Them 3 GitHub Actions Secrets (Settings -> Secrets and variables
+      -> Actions -> New repository secret) - nguoi dung tu them vi day
+      cung la quyen admin repo:
+        VM_HOST    = 20.48.61.15
+        VM_USER    = azureuser
+        VM_SSH_KEY = (toan bo noi dung file vsl-ci-deploy-key, ca dong
+                     BEGIN/END)
+
+10.5. Commit + push:
+      - Dang o nhanh "dev": git add, git commit, git push origin dev
+      - Job "deploy" trong workflow chi kich hoat khi push vao "main"
+        (dieu kien if: github.ref == 'refs/heads/main'), nen phai dua
+        thay doi len main:
+          git checkout main
+          git merge dev --ff-only   (fast-forward, khong tao merge
+                                      commit vi main dang la to tien
+                                      truc tiep cua dev)
+          git push origin main
+
+10.6. Xac nhan deploy tu dong chay dung: theo doi container "vsl-
+      backend" tren VM qua SSH, thay image SHA doi tu
+      sha256:26df38ea... sang sha256:68895605... va container duoc
+      tao lai (STARTED thoi diem moi), roi chuyen "healthy", va van
+      truy cap duoc tu ben ngoai qua curl.
+
+
+PHAN 11: KET QUA CUOI CUNG
+------------------------------
+- Backend API   : http://20.48.61.15:8080
+- Health check  : http://20.48.61.15:8080/api/health
+- MinIO S3 API  : http://20.48.61.15:9000
+- Auto-deploy   : push code len nhanh main -> tu dong deploy, khong
+                  can thao tac thu cong.
+
+VIEC CON LAI (chua lam, de tuy ban):
+- Sua CORS trong SecurityConfig.java (dang "*") khi frontend co domain
+  that.
+- Khi co domain rieng: cau hinh Nginx + Let's Encrypt de co HTTPS that
+  (hien tai dang chay http:// thuan tuy qua IP).
+- Xoa 2 file "vsl-ci-deploy-key" / "vsl-ci-deploy-key.pub" khoi may
+  local sau khi da luu vao GitHub Secrets (khong con can giu ban ro
+  tren dia).
+- Nho tat/Stop VM khi khong dung de tiet kiem credit Azure for Students
+  ($100), dung Auto-shutdown 00:00 nhu luoi an toan phu.
