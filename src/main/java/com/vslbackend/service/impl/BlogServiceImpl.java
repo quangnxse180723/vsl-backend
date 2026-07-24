@@ -14,6 +14,7 @@ import com.vslbackend.repository.*;
 import com.vslbackend.service.GeminiModerationService;
 import com.vslbackend.service.MinioService;
 import com.vslbackend.service.inter.BlogService;
+import com.vslbackend.util.VietnameseText;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -83,6 +84,30 @@ public class BlogServiceImpl implements BlogService {
                     ? "Noi dung khong phu hop voi tieu chuan cong dong."
                     : result.reason();
             throw new AppException(ErrorCode.BLOG_REJECTED, reason);
+        }
+    }
+
+    /**
+     * Chan dang (repost) noi dung trung khop voi mot bai da tung bi to cao - du bai goc con
+     * ton tai, da bi go, hay report chi dang PENDING. excludeBlogId: bo qua chinh bai dang
+     * duoc cap nhat (truyen null khi tao moi) de tac gia van sua/dang lai bai cua chinh minh
+     * duoc neu noi dung khong doi.
+     * <p>
+     * So khop tren ban da CHUAN HOA (bo dau, ha chu thuong, gom khoang trang) nen cac bien the
+     * re tien nhu doi hoa/thuong, bo dau, them khoang trang deu bi chan. Van la so khop CHINH XAC
+     * sau chuan hoa - viet lai noi dung theo cach khac thi khong chan duoc (do kiem duyet AI lo).
+     */
+    private void checkNotReportedContentOrThrow(String title, String content, Long excludeBlogId) {
+        String foldedTitle = VietnameseText.fold(title);
+        String foldedContent = VietnameseText.fold(content);
+
+        boolean clash = blogReportRepository.findReportedBlogs().stream()
+                .filter(b -> excludeBlogId == null || !excludeBlogId.equals(b.getId()))
+                .anyMatch(b -> VietnameseText.fold(b.getTitle()).equals(foldedTitle)
+                        && VietnameseText.fold(b.getContent()).equals(foldedContent));
+
+        if (clash) {
+            throw new AppException(ErrorCode.BLOG_CONTENT_ALREADY_REPORTED);
         }
     }
 
@@ -191,6 +216,9 @@ public class BlogServiceImpl implements BlogService {
     public void deleteBlog(Long id) {
         Blog blog = blogRepository.findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.BLOG_NOT_FOUND));
+        // Admin cung bi chan nhu user: xoa cung se cuon theo don to cao. Muon go bai thi
+        // dung removeBlogByAdmin (giu lai can cu), khong dung xoa cung.
+        guardAgainstDeletingReportedBlog(blog);
         hardDelete(blog);
     }
 
@@ -241,6 +269,7 @@ public class BlogServiceImpl implements BlogService {
 
         // Kiem duyet AI khi bai duoc dang cong khai (PUBLISHED). Nhap (DRAFT) thi bo qua.
         if (status == BlogStatus.PUBLISHED) {
+            checkNotReportedContentOrThrow(request.getTitle(), request.getContent(), null);
             moderateOrThrow(request.getTitle(), request.getContent());
         }
 
@@ -254,14 +283,20 @@ public class BlogServiceImpl implements BlogService {
         return toResponse(blogRepository.save(blog), authorId);
     }
 
-    @Override
-    public BlogResponse updateUserBlog(Long blogId, Long userId, UserUpdateBlogRequest request) {
+    /** Lay bai viet cua chinh nguoi dung, nem loi neu khong ton tai hoac khong phai bai cua ho. */
+    private Blog getOwnedBlogOrThrow(Long blogId, Long userId, String noPermissionMessage) {
         Blog blog = blogRepository.findById(blogId)
                 .orElseThrow(() -> new AppException(ErrorCode.BLOG_NOT_FOUND));
-
         if (blog.getAuthor() == null || !blog.getAuthor().getUserId().equals(userId)) {
-            throw new AppException(ErrorCode.INVALID_REQUEST, "Ban khong co quyen sua bai viet nay");
+            throw new AppException(ErrorCode.INVALID_REQUEST, noPermissionMessage);
         }
+        return blog;
+    }
+
+    @Override
+    public BlogResponse updateUserBlog(Long blogId, Long userId, UserUpdateBlogRequest request) {
+        Blog blog = getOwnedBlogOrThrow(blogId, userId, "Ban khong co quyen sua bai viet nay");
+
         if (blog.getStatus() == BlogStatus.REMOVED) {
             throw new AppException(ErrorCode.INVALID_REQUEST, "Bai viet da bi go, khong the chinh sua");
         }
@@ -270,6 +305,7 @@ public class BlogServiceImpl implements BlogService {
 
         // Kiem duyet lai khi noi dung se duoc dang cong khai
         if (newStatus == BlogStatus.PUBLISHED) {
+            checkNotReportedContentOrThrow(request.getTitle(), request.getContent(), blogId);
             moderateOrThrow(request.getTitle(), request.getContent());
         }
 
@@ -282,25 +318,14 @@ public class BlogServiceImpl implements BlogService {
 
     @Override
     public void deleteUserBlog(Long blogId, Long userId) {
-        Blog blog = blogRepository.findById(blogId)
-                .orElseThrow(() -> new AppException(ErrorCode.BLOG_NOT_FOUND));
-
-        if (blog.getAuthor() == null || !blog.getAuthor().getUserId().equals(userId)) {
-            throw new AppException(ErrorCode.INVALID_REQUEST, "Ban khong co quyen xoa bai viet nay");
-        }
-
+        Blog blog = getOwnedBlogOrThrow(blogId, userId, "Ban khong co quyen xoa bai viet nay");
+        guardAgainstDeletingReportedBlog(blog);
         hardDelete(blog);
     }
 
     @Override
     public String uploadUserBlogThumbnail(Long blogId, Long userId, MultipartFile image) {
-        Blog blog = blogRepository.findById(blogId)
-                .orElseThrow(() -> new AppException(ErrorCode.BLOG_NOT_FOUND));
-
-        if (blog.getAuthor() == null || !blog.getAuthor().getUserId().equals(userId)) {
-            throw new AppException(ErrorCode.INVALID_REQUEST, "Ban khong co quyen cap nhat bai viet nay");
-        }
-
+        Blog blog = getOwnedBlogOrThrow(blogId, userId, "Ban khong co quyen cap nhat bai viet nay");
         return doUploadThumbnail(blog, image);
     }
 
@@ -314,11 +339,39 @@ public class BlogServiceImpl implements BlogService {
     }
     // ──────────────────────── HELPERS ────────────────────────
 
+    /**
+     * Doc status tu request cua NGUOI DUNG - chi cho phep DRAFT / PUBLISHED.
+     * REMOVED la trang thai do he thong dat (admin go bai), khong the tu gui len,
+     * tranh viec tu danh dau bai de an khoi danh sach.
+     */
     private BlogStatus parseStatus(String raw) {
+        BlogStatus status;
         try {
-            return BlogStatus.valueOf(raw != null ? raw.toUpperCase() : "DRAFT");
+            status = BlogStatus.valueOf(raw != null ? raw.toUpperCase() : "DRAFT");
         } catch (IllegalArgumentException e) {
             return BlogStatus.DRAFT;
+        }
+        return status == BlogStatus.PUBLISHED ? BlogStatus.PUBLISHED : BlogStatus.DRAFT;
+    }
+
+    /**
+     * Chan xoa CUNG mot bai dang / da dinh to cao - ap dung cho CA user lan admin.
+     * <p>
+     * Ly do: hardDelete() xoa luon cac don to cao cua bai, lam mat can cu de chan dang lai
+     * (repost) chinh noi dung do. Chan khi:
+     * <ul>
+     *   <li>con don to cao dang cho xu ly (PENDING) - vu viec chua nga ngu; hoac</li>
+     *   <li>bai da bi admin go (REMOVED) - quyet dinh go bai khong duoc xoa dau vet.</li>
+     * </ul>
+     * Loi thoat: tac gia co the chuyen bai ve DRAFT de an khoi trang cong khai; admin muon
+     * go bai thi dung removeBlogByAdmin (giu lai ca bai lan don to cao). Neu admin da xu ly
+     * ma khong go bai (report RESOLVED, bai van PUBLISHED) tuc la noi dung khong vi pham
+     * -> cho xoa binh thuong.
+     */
+    private void guardAgainstDeletingReportedBlog(Blog blog) {
+        if (blog.getStatus() == BlogStatus.REMOVED
+                || blogReportRepository.existsByBlog_IdAndStatus(blog.getId(), ReportStatus.PENDING)) {
+            throw new AppException(ErrorCode.BLOG_UNDER_REPORT);
         }
     }
 
