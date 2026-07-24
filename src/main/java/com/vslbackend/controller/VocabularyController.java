@@ -1,7 +1,9 @@
 package com.vslbackend.controller;
 
 import com.vslbackend.dto.response.ApiResponse;
+import com.vslbackend.dto.response.VocabularyExistsResponse;
 import com.vslbackend.dto.response.VocabularyResponse;
+import com.vslbackend.dto.response.VocabularySynonymResponse;
 import com.vslbackend.service.inter.VocabularyService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -35,6 +37,26 @@ public class VocabularyController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         return ResponseEntity.ok(ApiResponse.of("Ket qua tim kiem", vocabularyService.search(keyword, page, size)));
+    }
+
+    /**
+     * Kiem tra tu vung da ton tai chua (so khop chinh xac ca chuoi, khong phan biet hoa/thuong,
+     * tren TOAN he thong). Dung cho form de xuat tu vung cua nguoi dung.
+     */
+    @GetMapping("/exists")
+    public ResponseEntity<ApiResponse<VocabularyExistsResponse>> exists(
+            @RequestParam @NotBlank(message = "Word cannot be blank") String word) {
+        return ResponseEntity.ok(ApiResponse.of("Ket qua kiem tra", vocabularyService.checkWordExists(word)));
+    }
+
+    /**
+     * Dung AI quet cac tu da co co nghia giong / dong nghia voi tu ung vien (goi y, khong chan submit).
+     * FAIL-OPEN: khi AI tat / thieu key / loi -> tra ve aiChecked=false, synonyms rong.
+     */
+    @GetMapping("/ai-synonyms")
+    public ResponseEntity<ApiResponse<VocabularySynonymResponse>> aiSynonyms(
+            @RequestParam @NotBlank(message = "Word cannot be blank") String word) {
+        return ResponseEntity.ok(ApiResponse.of("Ket qua quet AI", vocabularyService.findSynonyms(word)));
     }
 
     @GetMapping("/category/{id}")
