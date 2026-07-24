@@ -72,6 +72,7 @@ public enum ErrorCode {
     ALREADY_REPORTED("BLOG_6006", "Ban da to cao bai viet nay roi", HttpStatus.CONFLICT),
     CANNOT_REPORT_OWN_BLOG("BLOG_6007", "Ban khong the to cao bai viet cua chinh minh", HttpStatus.BAD_REQUEST),
     BLOG_CONTENT_ALREADY_REPORTED("BLOG_6011", "Noi dung nay da tung bi to cao truoc do, khong the dang lai", HttpStatus.CONFLICT),
+    BLOG_DUPLICATE_CONTENT("BLOG_6013", "Da co bai viet cong khai voi noi dung nay, khong the dang trung lap", HttpStatus.CONFLICT),
     BLOG_UNDER_REPORT("BLOG_6012", "Bai viet dang bi to cao va cho quan tri vien xu ly nen khong the xoa. Ban co the chuyen bai ve ban nhap de an khoi trang cong khai.", HttpStatus.CONFLICT),
     CANNOT_FOLLOW_SELF("BLOG_6008", "Ban khong the tu theo doi chinh minh", HttpStatus.BAD_REQUEST),
     NOT_FRIEND("BLOG_6009", "Chi co the chia se qua profile voi ban be", HttpStatus.FORBIDDEN),

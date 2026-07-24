@@ -111,6 +111,29 @@ public class BlogServiceImpl implements BlogService {
         }
     }
 
+    /**
+     * Chan dang TRUNG LAP: bai moi khong duoc trung noi dung voi mot bai da CONG KHAI nao khac
+     * (ke ca cua nguoi khac). excludeBlogId: bo qua chinh bai dang duoc cap nhat (truyen null khi
+     * tao moi) de tac gia van luu/dang lai bai cua chinh minh duoc khi noi dung khong doi.
+     * <p>
+     * So khop tren ban da CHUAN HOA (fold: bo dau, ha chu thuong, gom khoang trang) va yeu cau
+     * TRUNG CA tieu de LAN noi dung - tuc la trung "tung chu", nen hai bai chi tinh co giong
+     * nghia/y tuong nhung dien dat khac nhau se KHONG bi chan.
+     */
+    private void checkNotDuplicatePublishedOrThrow(String title, String content, Long excludeBlogId) {
+        String foldedTitle = VietnameseText.fold(title);
+        String foldedContent = VietnameseText.fold(content);
+
+        boolean duplicate = blogRepository.findAllPublished().stream()
+                .filter(b -> excludeBlogId == null || !excludeBlogId.equals(b.getId()))
+                .anyMatch(b -> VietnameseText.fold(b.getTitle()).equals(foldedTitle)
+                        && VietnameseText.fold(b.getContent()).equals(foldedContent));
+
+        if (duplicate) {
+            throw new AppException(ErrorCode.BLOG_DUPLICATE_CONTENT);
+        }
+    }
+
     @Override
     public Page<BlogResponse> getAllBlogs(int page, int size, Long adminId) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
@@ -270,6 +293,7 @@ public class BlogServiceImpl implements BlogService {
         // Kiem duyet AI khi bai duoc dang cong khai (PUBLISHED). Nhap (DRAFT) thi bo qua.
         if (status == BlogStatus.PUBLISHED) {
             checkNotReportedContentOrThrow(request.getTitle(), request.getContent(), null);
+            checkNotDuplicatePublishedOrThrow(request.getTitle(), request.getContent(), null);
             moderateOrThrow(request.getTitle(), request.getContent());
         }
 
@@ -306,6 +330,7 @@ public class BlogServiceImpl implements BlogService {
         // Kiem duyet lai khi noi dung se duoc dang cong khai
         if (newStatus == BlogStatus.PUBLISHED) {
             checkNotReportedContentOrThrow(request.getTitle(), request.getContent(), blogId);
+            checkNotDuplicatePublishedOrThrow(request.getTitle(), request.getContent(), blogId);
             moderateOrThrow(request.getTitle(), request.getContent());
         }
 
