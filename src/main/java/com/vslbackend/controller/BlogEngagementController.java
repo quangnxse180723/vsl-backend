@@ -35,35 +35,35 @@ public class BlogEngagementController {
 
     @PostMapping("/{id}/like")
     public ResponseEntity<LikeResponse> toggleLike(
-            @PathVariable Long id,
+            @PathVariable("id") Long id,
             @AuthenticationPrincipal CustomUserDetails principal) {
         return ResponseEntity.ok(engagementService.toggleLike(id, principal.getUser().getUserId()));
     }
 
     @PostMapping("/comments/{commentId}/like")
     public ResponseEntity<LikeResponse> toggleCommentLike(
-            @PathVariable Long commentId,
+            @PathVariable("commentId") Long commentId,
             @AuthenticationPrincipal CustomUserDetails principal) {
         return ResponseEntity.ok(engagementService.toggleCommentLike(commentId, principal.getUser().getUserId()));
     }
 
     @PostMapping("/replies/{replyId}/like")
     public ResponseEntity<LikeResponse> toggleReplyLike(
-            @PathVariable Long replyId,
+            @PathVariable("replyId") Long replyId,
             @AuthenticationPrincipal CustomUserDetails principal) {
         return ResponseEntity.ok(engagementService.toggleReplyLike(replyId, principal.getUser().getUserId()));
     }
 
     @GetMapping("/{id}/comments")
     public ResponseEntity<List<CommentResponse>> getComments(
-            @PathVariable Long id,
+            @PathVariable("id") Long id,
             @AuthenticationPrincipal CustomUserDetails principal) {
         return ResponseEntity.ok(engagementService.getComments(id, uid(principal)));
     }
 
     @PostMapping("/{id}/comments")
     public ResponseEntity<CommentResponse> addComment(
-            @PathVariable Long id,
+            @PathVariable("id") Long id,
             @Valid @RequestBody CreateCommentRequest request,
             @AuthenticationPrincipal CustomUserDetails principal) {
         return ResponseEntity.status(HttpStatus.CREATED).body(
@@ -76,8 +76,8 @@ public class BlogEngagementController {
 
     @DeleteMapping("/{id}/comments/{commentId}")
     public ResponseEntity<String> deleteComment(
-            @PathVariable Long id,
-            @PathVariable Long commentId,
+            @PathVariable("id") Long id,
+            @PathVariable("commentId") Long commentId,
             @AuthenticationPrincipal CustomUserDetails principal) {
         engagementService.deleteComment(commentId, principal.getUser().getUserId());
         return ResponseEntity.ok("Comment deleted");
@@ -85,16 +85,16 @@ public class BlogEngagementController {
 
     @PostMapping("/{id}/report")
     public ResponseEntity<String> reportBlog(
-            @PathVariable Long id,
+            @PathVariable("id") Long id,
             @Valid @RequestBody CreateReportRequest request,
             @AuthenticationPrincipal CustomUserDetails principal) {
         engagementService.reportBlog(id, principal.getUser().getUserId(), request.getReason());
         return ResponseEntity.ok("Da gui to cao, cam on ban. Admin se xem xet som.");
     }
 
-    @PostMapping("/{commentId}/replies")
+    @PostMapping("/comments/{commentId}/replies")
     public ResponseEntity<ReplyResponse> addReply(
-            @PathVariable Long commentId,
+            @PathVariable("commentId") Long commentId,
             @Valid @RequestBody CreateReplyRequest request,
             @AuthenticationPrincipal CustomUserDetails principal) {
         return ResponseEntity.status(HttpStatus.CREATED).body(
@@ -105,9 +105,9 @@ public class BlogEngagementController {
                         request.getContent()));
     }
 
-    @GetMapping("/{commentId}/replies")
+    @GetMapping("/comments/{commentId}/replies")
     public ResponseEntity<Page<ReplyResponse>> getReplies(
-            @PathVariable Long commentId,
+            @PathVariable("commentId") Long commentId,
             @AuthenticationPrincipal CustomUserDetails principal,
             @PageableDefault(
                     page = 0,
@@ -120,7 +120,7 @@ public class BlogEngagementController {
 
     @DeleteMapping("/replies/{replyId}")
     public ResponseEntity<Void> deleteReply(
-            @PathVariable Long replyId,
+            @PathVariable("replyId") Long replyId,
             @AuthenticationPrincipal CustomUserDetails principal) {
         engagementService.deleteReply(replyId, principal.getUser().getUserId());
         return ResponseEntity.ok().build();
@@ -128,7 +128,7 @@ public class BlogEngagementController {
 
     @PostMapping("/{blogId}/share")
     public ResponseEntity<ShareResponse> shareBlog(
-            @PathVariable Long blogId,
+            @PathVariable("blogId") Long blogId,
             @AuthenticationPrincipal CustomUserDetails principal,
             @RequestParam(defaultValue = "COPY_URL") String shareType,
             @RequestParam(required = false) Long recipientUserId) {
