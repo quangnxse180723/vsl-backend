@@ -1,41 +1,43 @@
 package com.vslbackend.entity;
 
 import jakarta.persistence.*;
-import lombok.*;
-import org.hibernate.annotations.CreationTimestamp;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
-/** Mot binh luan cua user duoi 1 bai blog. */
 @Entity
-@Table(name = "blog_comments")
-@Getter
-@Setter
+@Table(name = "comment_replies")
+@Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
-public class BlogComment {
-
+public class CommentReply {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "blog_id", nullable = false)
-    private Blog blog;
+    @JoinColumn(name = "comment_id", nullable = false)
+    private BlogComment comment;     // comment cha
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
-    private User user;
+    private User user;               // người reply
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "mentioned_user_id")
-    private User mentionedUser;
+    private User mentionedUser;      // user được tag (@mention), có thể null
 
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
-    @CreationTimestamp
-    @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
+
+    @PrePersist
+    public void prePersist() {
+        createdAt = LocalDateTime.now();
+    }
 }

@@ -23,6 +23,8 @@ public class BlogResponse {
     private long likeCount;
     private long commentCount;
     private boolean likedByMe;
+    private boolean followedAuthor;
+    private boolean friendWithAuthor;
 
     // Chi set khi status = REMOVED (bai bi admin go) - chi tac gia thay o "bai cua toi"
     private String deletionReason;

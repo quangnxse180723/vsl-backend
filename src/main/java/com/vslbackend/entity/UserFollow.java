@@ -6,34 +6,32 @@ import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
 
-/** Mot binh luan cua user duoi 1 bai blog. */
 @Entity
-@Table(name = "blog_comments")
+@Table(
+        name = "user_follows",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_user_follow_pair",
+                columnNames = {"follower_id", "following_id"}
+        )
+)
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class BlogComment {
+public class UserFollow {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "blog_id", nullable = false)
-    private Blog blog;
+    @JoinColumn(name = "follower_id", nullable = false)
+    private User follower;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "mentioned_user_id")
-    private User mentionedUser;
-
-    @Column(nullable = false, columnDefinition = "TEXT")
-    private String content;
+    @JoinColumn(name = "following_id", nullable = false)
+    private User following;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

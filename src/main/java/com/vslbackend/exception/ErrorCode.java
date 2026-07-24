@@ -73,6 +73,9 @@ public enum ErrorCode {
     CANNOT_REPORT_OWN_BLOG("BLOG_6007", "Ban khong the to cao bai viet cua chinh minh", HttpStatus.BAD_REQUEST),
     BLOG_CONTENT_ALREADY_REPORTED("BLOG_6008", "Noi dung nay da tung bi to cao truoc do, khong the dang lai", HttpStatus.CONFLICT),
     BLOG_UNDER_REPORT("BLOG_6009", "Bai viet dang bi to cao va cho quan tri vien xu ly nen khong the xoa. Ban co the chuyen bai ve ban nhap de an khoi trang cong khai.", HttpStatus.CONFLICT);
+    CANNOT_FOLLOW_SELF("BLOG_6008", "Ban khong the tu theo doi chinh minh", HttpStatus.BAD_REQUEST),
+    NOT_FRIEND("BLOG_6009", "Chi co the chia se qua profile voi ban be", HttpStatus.FORBIDDEN),
+    NOTIFICATION_NOT_FOUND("BLOG_6010", "Khong tim thay thong bao", HttpStatus.NOT_FOUND);
 
     private final String code;
     private final String message;

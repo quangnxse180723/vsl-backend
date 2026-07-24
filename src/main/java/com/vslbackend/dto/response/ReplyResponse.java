@@ -4,13 +4,12 @@ import lombok.Builder;
 import lombok.Data;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 @Data
 @Builder
-public class CommentResponse {
+public class ReplyResponse {
     private Long id;
-    private Long blogId;
+    private Long commentId;
     private Long userId;
     private String userName;
     private String userAvatar;
@@ -18,8 +17,6 @@ public class CommentResponse {
     private String mentionedUserName;
     private String content;
     private LocalDateTime createdAt;
-    private List<ReplyResponse> replies;
-    private long replyCount;
     private long likeCount;
     private boolean likedByMe;
 }

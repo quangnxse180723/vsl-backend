@@ -1,20 +1,20 @@
 package com.vslbackend.entity;
 
 import jakarta.persistence.*;
-import lombok.*;
-import org.hibernate.annotations.CreationTimestamp;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
-/** Mot binh luan cua user duoi 1 bai blog. */
 @Entity
-@Table(name = "blog_comments")
-@Getter
-@Setter
+@Table(name = "blog_shares")
+@Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
-public class BlogComment {
+public class BlogShare {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -29,13 +29,19 @@ public class BlogComment {
     private User user;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "mentioned_user_id")
-    private User mentionedUser;
+    @JoinColumn(name = "recipient_user_id")
+    private User recipientUser;
 
-    @Column(nullable = false, columnDefinition = "TEXT")
-    private String content;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private ShareType shareType;     // COPY_URL hoặc PROFILE
 
-    @CreationTimestamp
-    @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
+
+    @PrePersist
+    public void prePersist() {
+        createdAt = LocalDateTime.now();
+    }
+
+    public enum ShareType { COPY_URL, PROFILE }
 }

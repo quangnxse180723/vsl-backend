@@ -4,19 +4,13 @@ import com.vslbackend.dto.request.admin.AdminCreateBlogRequest;
 import com.vslbackend.dto.request.admin.AdminUpdateBlogRequest;
 import com.vslbackend.dto.request.user.UserCreateBlogRequest;
 import com.vslbackend.dto.request.user.UserUpdateBlogRequest;
+import com.vslbackend.dto.response.BlogSearchResponse;
 import com.vslbackend.dto.response.BlogResponse;
-import com.vslbackend.entity.Blog;
-import com.vslbackend.entity.BlogReport;
-import com.vslbackend.entity.BlogStatus;
-import com.vslbackend.entity.ReportStatus;
-import com.vslbackend.entity.User;
+import com.vslbackend.dto.response.UserSummaryResponse;
+import com.vslbackend.entity.*;
 import com.vslbackend.exception.AppException;
 import com.vslbackend.exception.ErrorCode;
-import com.vslbackend.repository.BlogCommentRepository;
-import com.vslbackend.repository.BlogLikeRepository;
-import com.vslbackend.repository.BlogReportRepository;
-import com.vslbackend.repository.BlogRepository;
-import com.vslbackend.repository.UserRepository;
+import com.vslbackend.repository.*;
 import com.vslbackend.service.GeminiModerationService;
 import com.vslbackend.service.MinioService;
 import com.vslbackend.service.inter.BlogService;
@@ -45,23 +39,39 @@ public class BlogServiceImpl implements BlogService {
     private final BlogLikeRepository blogLikeRepository;
     private final BlogCommentRepository blogCommentRepository;
     private final BlogReportRepository blogReportRepository;
+    private final BlogShareRepository blogShareRepository;
+    private final UserFollowRepository userFollowRepository;
+    private final CommentLikeRepository commentLikeRepository;
+    private final ReplyLikeRepository replyLikeRepository;
+    private final CommentReplyRepository commentReplyRepository;
+    private final BlogNotificationRepository blogNotificationRepository;
 
     private BlogResponse toResponse(Blog blog, Long currentUserId) {
+        Long authorId = blog.getAuthor() != null ? blog.getAuthor().getUserId() : null;
         boolean likedByMe = currentUserId != null
                 && blogLikeRepository.existsByBlog_IdAndUser_UserId(blog.getId(), currentUserId);
+        boolean followedAuthor = currentUserId != null
+                && authorId != null
+                && !authorId.equals(currentUserId)
+                && userFollowRepository.existsByFollower_UserIdAndFollowing_UserId(currentUserId, authorId);
+        boolean friendWithAuthor = followedAuthor
+                && userFollowRepository.existsByFollower_UserIdAndFollowing_UserId(authorId, currentUserId);
+
         return BlogResponse.builder()
                 .id(blog.getId())
                 .title(blog.getTitle())
                 .content(blog.getContent())
                 .thumbnailUrl(blog.getThumbnailUrl())
                 .status(blog.getStatus())
-                .authorId(blog.getAuthor() != null ? blog.getAuthor().getUserId() : null)
-                .authorName(blog.getAuthor() != null ? blog.getAuthor().getFullName() : null)
+                .authorId(authorId)
+                .authorName(blog.getAuthor() != null ? displayName(blog.getAuthor()) : null)
                 .createdAt(blog.getCreatedAt())
                 .updatedAt(blog.getUpdatedAt())
                 .likeCount(blogLikeRepository.countByBlog_Id(blog.getId()))
                 .commentCount(blogCommentRepository.countByBlog_Id(blog.getId()))
                 .likedByMe(likedByMe)
+                .followedAuthor(followedAuthor)
+                .friendWithAuthor(friendWithAuthor)
                 .deletionReason(blog.getStatus() == BlogStatus.REMOVED ? blog.getDeletionReason() : null)
                 .build();
     }
@@ -111,8 +121,42 @@ public class BlogServiceImpl implements BlogService {
     @Override
     public Page<BlogResponse> getPublishedBlogs(int page, int size, Long currentUserId) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
-        return blogRepository.findByStatus(BlogStatus.PUBLISHED, pageable)
+        Page<Blog> blogs = currentUserId == null
+                ? blogRepository.findByStatus(BlogStatus.PUBLISHED, pageable)
+                : blogRepository.findPublishedPrioritizingFollowed(currentUserId, pageable);
+        return blogs
                 .map(b -> toResponse(b, currentUserId));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public BlogSearchResponse searchPublishedBlogsAndUsers(String keyword, int page, int size, Long currentUserId) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        String term = keyword == null ? "" : keyword.trim();
+
+        Page<BlogResponse> blogPage = term.isBlank()
+                ? getPublishedBlogs(page, size, currentUserId)
+                : blogRepository.searchPublished(term, pageable).map(b -> toResponse(b, currentUserId));
+
+        Page<UserSummaryResponse> userPage = term.isBlank()
+                ? Page.<UserSummaryResponse>empty(pageable)
+                : userRepository.searchByNameOrUsername(term, UserStatus.ACTIVE, pageable)
+                .map(user -> toUserSummary(user, currentUserId));
+
+        return BlogSearchResponse.builder()
+                .blogs(blogPage)
+                .users(userPage)
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<BlogResponse> getPublishedBlogsByUser(Long userId, int page, int size, Long currentUserId) {
+        userRepository.findById(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        return blogRepository.findByStatusAndAuthor_UserId(BlogStatus.PUBLISHED, userId, pageable)
+                .map(blog -> toResponse(blog, currentUserId));
     }
 
     @Override
@@ -205,6 +249,8 @@ public class BlogServiceImpl implements BlogService {
         return doUploadThumbnail(blog, image);
     }
 
+
+
     // ──────────────────────── USER SPECIFIC METHODS ────────────────────────
 
     @Override
@@ -283,6 +329,14 @@ public class BlogServiceImpl implements BlogService {
         return doUploadThumbnail(blog, image);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public Page<BlogResponse> getSharedBlogsOnProfile(Long userId, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        return blogShareRepository
+                .findProfileSharesVisibleToUser(userId, BlogShare.ShareType.PROFILE, pageable)
+                .map(share -> toResponse(share.getBlog(), userId));
+    }
     // ──────────────────────── HELPERS ────────────────────────
 
     /**
@@ -323,6 +377,13 @@ public class BlogServiceImpl implements BlogService {
 
     /** Xoa cung 1 bai + toan bo like/comment/report/thumbnail lien quan. */
     private void hardDelete(Blog blog) {
+        blogNotificationRepository.deleteByReply_Comment_Blog_Id(blog.getId());
+        replyLikeRepository.deleteByReply_Comment_Blog_Id(blog.getId());
+        commentReplyRepository.deleteByComment_Blog_Id(blog.getId());
+        blogNotificationRepository.deleteByComment_Blog_Id(blog.getId());
+        commentLikeRepository.deleteByComment_Blog_Id(blog.getId());
+        blogNotificationRepository.deleteByBlog_Id(blog.getId());
+        blogShareRepository.deleteByBlog_Id(blog.getId());
         blogLikeRepository.deleteByBlog_Id(blog.getId());
         blogCommentRepository.deleteByBlog_Id(blog.getId());
         blogReportRepository.deleteByBlog_Id(blog.getId());
@@ -346,5 +407,31 @@ public class BlogServiceImpl implements BlogService {
     private String extractExt(String filename) {
         if (filename == null || !filename.contains(".")) return ".jpg";
         return filename.substring(filename.lastIndexOf('.'));
+    }
+
+    private UserSummaryResponse toUserSummary(User user, Long currentUserId) {
+        boolean followedByMe = currentUserId != null
+                && userFollowRepository.existsByFollower_UserIdAndFollowing_UserId(currentUserId, user.getUserId());
+        boolean followsMe = currentUserId != null
+                && userFollowRepository.existsByFollower_UserIdAndFollowing_UserId(user.getUserId(), currentUserId);
+
+        return UserSummaryResponse.builder()
+                .userId(user.getUserId())
+                .username(user.getUsername())
+                .fullName(user.getFullName())
+                .avatarUrl(user.getAvatarUrl())
+                .followerCount(userFollowRepository.countByFollowing_UserId(user.getUserId()))
+                .followingCount(userFollowRepository.countByFollower_UserId(user.getUserId()))
+                .followedByMe(followedByMe)
+                .followsMe(followsMe)
+                .friend(followedByMe && followsMe)
+                .build();
+    }
+
+    private String displayName(User user) {
+        if (user.getFullName() != null && !user.getFullName().isBlank()) {
+            return user.getFullName();
+        }
+        return user.getUsername();
     }
 }
